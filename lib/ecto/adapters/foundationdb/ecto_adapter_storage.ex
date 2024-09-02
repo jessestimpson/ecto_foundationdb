@@ -3,6 +3,7 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterStorage do
   @behaviour Ecto.Adapter.Storage
 
   alias EctoFoundationDB.Layer.Pack
+  alias EctoFoundationDB.Layer.Tx
   alias EctoFoundationDB.Options
 
   @all_data_start_key ""
@@ -64,6 +65,8 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterStorage do
   def empty_tenant(dbtx, tenant_id, options) do
     tenant = open_tenant(dbtx, tenant_id, options)
 
+    Tx.assert_tx_enabled()
+
     :erlfdb.transactional(tenant, fn tx ->
       {start_key, end_key} = Pack.adapter_repo_range()
       :erlfdb.clear_range(tx, start_key, end_key)
@@ -74,6 +77,8 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterStorage do
 
   def clear_tenant(dbtx, tenant_id, options) do
     tenant = open_tenant(dbtx, tenant_id, options)
+
+    Tx.assert_tx_enabled()
 
     :erlfdb.transactional(tenant, fn tx ->
       :erlfdb.clear_range(tx, @all_data_start_key, @all_data_end_key)
@@ -108,6 +113,8 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterStorage do
 
       {:ok, _} ->
         tenant = open_named_tenant(db, tenant_name)
+
+        Tx.assert_tx_enabled()
 
         :erlfdb.transactional(tenant, fn tx ->
           :erlfdb.clear_range(tx, @all_data_start_key, @all_data_end_key)

@@ -726,4 +726,7 @@ defmodule Ecto.Adapters.FoundationDB do
 
   @impl Ecto.Adapter.Transaction
   defdelegate rollback(adapter_meta, value), to: EctoAdapterTransaction
+
+  defdelegate reject_new_transactions_in_self(), to: Tx
+  defdelegate allow_new_transactions_after_rejection(), to: Tx
 end

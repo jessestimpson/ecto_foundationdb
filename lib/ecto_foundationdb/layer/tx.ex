@@ -1,6 +1,7 @@
 defmodule EctoFoundationDB.Layer.Tx do
   @moduledoc false
   alias EctoFoundationDB.Exception.IncorrectTenancy
+  alias EctoFoundationDB.Exception.TransactionsDisabled
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Indexer
   alias EctoFoundationDB.Layer.Fields
@@ -10,6 +11,7 @@ defmodule EctoFoundationDB.Layer.Tx do
 
   @db_or_tenant :__ectofdbtxcontext__
   @tx :__ectofdbtx__
+  @tx_disabled :__ectofdbtxdisabled__
 
   def in_tenant_tx?(), do: in_tx?() and elem(Process.get(@db_or_tenant), 0) == :erlfdb_tenant
   def in_tx?(), do: not is_nil(Process.get(@tx))
@@ -26,6 +28,8 @@ defmodule EctoFoundationDB.Layer.Tx do
   def transactional_external(db_or_tenant, fun) do
     nil = Process.get(@db_or_tenant)
     nil = Process.get(@tx)
+
+    assert_tx_enabled()
 
     :erlfdb.transactional(
       db_or_tenant,
@@ -61,6 +65,7 @@ defmodule EctoFoundationDB.Layer.Tx do
   def transactional(context, fun) do
     case Process.get(@db_or_tenant, nil) do
       nil ->
+        assert_tx_enabled()
         :erlfdb.transactional(context, fun)
 
       ^context ->
@@ -76,6 +81,62 @@ defmodule EctoFoundationDB.Layer.Tx do
         This can be encountered when a struct read from one tenant is provided to a transaction from \
         another. In these cases, the prefix must explicitly be removed from the struct metadata.
         """
+    end
+  end
+
+  @doc """
+  Disables all new transactions within the current process.
+
+  When EctoFoundationDB is asked to start a transaction in this state,
+  the exception `EctoFoundationDB.Exception.TransactionsDisabled` is raised
+  instead.
+
+  When would you use this? For example, an application may wish to enforce that
+  certain code paths are guaranteed to not have database transactions, for
+  performance reasons, or code organization. EctoFoundationDB offers this feature
+  to enforce the rejection of transactions at Runtime.
+
+  ```elixir
+  try do
+    FoundationDB.reject_new_transactions_in_self()
+    # some work free of FDB transactions
+  after
+    FoundationDB.allow_new_transactions_after_rejection()
+  end
+  ```
+  """
+  def reject_new_transactions_in_self() do
+    Process.put(@tx_disabled, true)
+  end
+
+  @doc """
+  Enables all new transactions within the current process. This function
+  is only to be used after a call to `FoundationDB.disable_transactions/0`.
+  Do not use it otherwise.
+
+  You will likely want to do so in a try/after block like so:
+
+  ```elixir
+  try do
+    FoundationDB.reject_new_transactions_in_self()
+    # some work free of FDB transactions
+  after
+    FoundationDB.allow_new_transactions_after_rejection()
+  end
+  ```
+  """
+  def allow_new_transactions_after_rejection() do
+    Process.delete(@tx_disabled)
+  end
+
+  def assert_tx_enabled() do
+    tx_disabled = Process.get(@tx_disabled, nil)
+
+    if not is_nil(tx_disabled) do
+      raise TransactionsDisabled, """
+      EctoFoundationDB attempted to begin a transaction, but your application has requested that we raise this
+      exception instead of allowing the transaction.
+      """
     end
   end
 

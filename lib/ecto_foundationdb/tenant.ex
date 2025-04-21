@@ -168,9 +168,9 @@ defmodule EctoFoundationDB.Tenant do
     :erlfdb_tuple.pack(tuple)
   end
 
-  def primary_codec(tenant, tuple) when is_tuple(tuple) do
+  def primary_codec(tenant, tuple, vs \\ false) when is_tuple(tuple) do
     tuple = tenant.backend.extend_tuple(tuple, tenant.meta)
-    PrimaryKVCodec.new(tuple)
+    PrimaryKVCodec.new(tuple, vs)
   end
 
   def unpack(tenant, tuple) do

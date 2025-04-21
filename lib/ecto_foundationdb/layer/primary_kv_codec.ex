@@ -6,13 +6,15 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
   alias EctoFoundationDB.Options
   alias EctoFoundationDB.Tenant
 
-  defstruct [:tuple]
+  defstruct [:tuple, :vs?]
 
   @metadata_key :multikey
 
-  def new(tuple) do
-    %__MODULE__{tuple: tuple}
+  def new(tuple, vs \\ false) do
+    %__MODULE__{tuple: tuple, vs?: vs}
   end
+
+  def vs?(%__MODULE__{vs?: vs?}), do: vs?
 
   def stream_decode(kvs, tenant) do
     Stream.transform(
@@ -95,14 +97,31 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
   end
 
   def pack_key(kv_codec, t) do
-    kv_codec.tuple
-    |> add_codec_metadata(t)
-    |> :erlfdb_tuple.pack()
+    %__MODULE__{vs?: vs?} = kv_codec
+
+    tuple =
+      kv_codec.tuple
+      |> add_codec_metadata(t)
+
+    if vs?, do: :erlfdb_tuple.pack_vs(tuple), else: :erlfdb_tuple.pack(tuple)
+  end
+
+  def set_new_kvs(tx, %__MODULE__{vs?: true}, kvs) do
+    for {k, v} <- kvs do
+      :erlfdb.set_versionstamped_key(tx, k, v)
+    end
+  end
+
+  def set_new_kvs(tx, %__MODULE__{vs?: false}, kvs) do
+    for {k, v} <- kvs do
+      :erlfdb.set(tx, k, v)
+    end
   end
 
   def range(kv_codec) do
+    %__MODULE__{vs?: vs?} = kv_codec
     tuple = add_codec_metadata(kv_codec.tuple, nil)
-    start_key = :erlfdb_tuple.pack(tuple)
+    start_key = if vs?, do: :erlfdb_tuple.pack_vs(tuple), else: :erlfdb_tuple.pack(tuple)
     {start_key, start_key <> <<0xFF>>}
   end
 
@@ -136,7 +155,14 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
         """
 
       :error ->
-        item = %DecodedKV{codec: Pack.primary_write_key_to_codec(tenant, k), data_object: v}
+        key_tuple = Tenant.unpack(tenant, k)
+        data_object = extract_complete_vs(key_tuple, v)
+
+        item = %DecodedKV{
+          codec: Pack.primary_write_key_to_codec(tenant, k),
+          data_object: data_object
+        }
+
         {[item], %{acc | key_tuple: nil, values: [], meta: nil}}
     end
   end
@@ -154,6 +180,7 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
         case :erlang.crc32(fdb_value) do
           ^crc ->
             data_object = Pack.from_fdb_value(fdb_value)
+            data_object = extract_complete_vs(key_tuple, data_object)
 
             item =
               %DecodedKV{
@@ -177,6 +204,17 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
         raise """
         Metadata error. Previous: #{inspect({n, i, crc})}, Encountered: #{inspect(other)}
         """
+    end
+  end
+
+  defp extract_complete_vs(key_tuple, data_object) do
+    [{pk_field, stored_pk} | data_object_rest] = data_object
+
+    # When incomplete versionstamp is stored on in the value, we need to retrieve the pk from the key
+    if Pack.vs?(stored_pk) do
+      [{pk_field, Pack.get_vs_from_primary_key_tuple(key_tuple)} | data_object_rest]
+    else
+      data_object
     end
   end
 end

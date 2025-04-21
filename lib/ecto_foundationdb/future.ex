@@ -63,6 +63,18 @@ defmodule EctoFoundationDB.Future do
     %__MODULE__{fut | ref: ref, tx: tx, erlfdb_future: erlfdb_future, handler: &f.(g.(&1))}
   end
 
+  def set_result(fut, result) do
+    %__MODULE__{handler: f} = fut
+
+    %__MODULE__{
+      fut
+      | tx: nil,
+        erlfdb_future: nil,
+        result: f.(result),
+        handler: &Function.identity/1
+    }
+  end
+
   def result(fut = %__MODULE__{erlfdb_future: nil, handler: f}) do
     f.(fut.result)
   end

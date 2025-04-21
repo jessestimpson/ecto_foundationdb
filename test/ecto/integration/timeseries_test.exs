@@ -35,6 +35,8 @@ defmodule Ecto.Integration.TimeSeriesTest do
         |> FoundationDB.usetenant(tenant)
         |> TestRepo.insert()
 
+      assert is_integer(event_id)
+
       assert_raise Unsupported, ~r/Default Index query mismatch/, fn ->
         TestRepo.all(query, prefix: tenant)
       end

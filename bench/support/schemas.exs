@@ -1,9 +1,6 @@
 defmodule Ecto.Bench.User do
   use Ecto.Schema
 
-  @primary_key {:id, :binary_id, autogenerate: false}
-  @schema_context usetenant: true
-
   schema "users" do
     field(:name, :string)
     field(:email, :string)
@@ -21,8 +18,7 @@ defmodule Ecto.Bench.User do
     :time_attr,
     :date_attr,
     :naive_datetime_attr,
-    :uuid,
-    :id
+    :uuid
   ]
 
   def changeset() do
@@ -41,17 +37,13 @@ defmodule Ecto.Bench.User do
       time_attr: Time.utc_now() |> Time.truncate(:second),
       date_attr: Date.utc_today(),
       naive_datetime_attr: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
-      uuid: Ecto.UUID.generate(),
-      id: Ecto.UUID.generate()
+      uuid: Ecto.UUID.generate()
     }
   end
 end
 
 defmodule Ecto.Bench.Game do
   use Ecto.Schema
-
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @schema_context usetenant: true
 
   schema "games" do
     field(:name, :string)

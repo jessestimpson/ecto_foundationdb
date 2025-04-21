@@ -2,21 +2,52 @@ defmodule EctoFoundationDB.Layer.TxInsert do
   @moduledoc false
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Indexer
+  alias EctoFoundationDB.Future
   alias EctoFoundationDB.Layer.DecodedKV
   alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.PrimaryKVCodec
   alias EctoFoundationDB.Layer.Tx
 
-  defstruct [:tenant, :schema, :metadata, :write_primary, :options]
+  defstruct [:tenant, :schema, :source, :metadata, :write_primary, :options]
 
-  def new(tenant, schema, metadata, write_primary, options) do
+  def new(tenant, schema, source, metadata, write_primary, options) do
     %__MODULE__{
       tenant: tenant,
       schema: schema,
+      source: source,
       metadata: metadata,
       write_primary: write_primary,
       options: options
     }
+  end
+
+  def insert_one(
+        acc,
+        tx,
+        {{pk_field, pk}, future, data_object},
+        read_before_write
+      ) do
+    %__MODULE__{
+      tenant: tenant,
+      source: source
+    } = acc
+
+    {read_before_write, pk} =
+      if is_function(pk, 1), do: {false, pk.(tx)}, else: {read_before_write, pk}
+
+    kv_codec = Pack.primary_codec(tenant, source, pk)
+    data_object = [{pk_field, pk} | Keyword.delete(data_object, pk_field)]
+    kv = %DecodedKV{codec: kv_codec, data_object: data_object}
+
+    if read_before_write do
+      future = Tx.async_get(tenant, tx, kv_codec, future)
+      Future.apply(future, &do_set(acc, tx, kv, &1))
+    else
+      # We assume that the data doesn't exist. This speeds up data loading
+      # but can result in inconsistent indexes if objects do exist in
+      # the database that are being blindly overwritten.
+      Future.set_result(future, do_set(acc, tx, kv, nil))
+    end
   end
 
   def do_set(acc, tx, new_kv, nil) do
@@ -33,7 +64,7 @@ defmodule EctoFoundationDB.Layer.TxInsert do
     {_, kvs} = PrimaryKVCodec.encode(kv_codec, Pack.to_fdb_value(data_object), options)
 
     if write_primary do
-      for {k, v} <- kvs, do: :erlfdb.set(tx, k, v)
+      PrimaryKVCodec.set_new_kvs(tx, kv_codec, kvs)
     end
 
     # The indexer is not informed of the object splitting

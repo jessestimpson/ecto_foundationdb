@@ -6,9 +6,7 @@ defmodule EctoFoundationDB.Indexer do
   A faulty implementation may lead to data loss or corruption.
   """
   alias EctoFoundationDB.Index
-  alias EctoFoundationDB.Layer.DecodedKV
   alias EctoFoundationDB.Layer.Metadata
-  alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.PrimaryKVCodec
   alias EctoFoundationDB.QueryPlan
   alias EctoFoundationDB.Tenant
@@ -85,11 +83,14 @@ defmodule EctoFoundationDB.Indexer do
     do: apply(idx[:indexer], :unpack, [idx, plan, fdb_kv], &_unpack/3)
 
   ## Default behavior for standard key-value response
-  defp _unpack(_idx, plan, {fdb_key, fdb_value}),
-    do: %DecodedKV{
-      codec: Pack.primary_write_key_to_codec(plan.tenant, fdb_key),
-      data_object: Pack.from_fdb_value(fdb_value)
-    }
+  defp _unpack(_idx, plan, {fdb_key, fdb_value}) do
+    [kv] =
+      [{fdb_key, fdb_value}]
+      |> PrimaryKVCodec.stream_decode(plan.tenant)
+      |> Enum.to_list()
+
+    kv
+  end
 
   # Default behavior for get_mapped_range response
   defp _unpack(_idx, _plan, {{_pkey, _pvalue}, {_skeybegin, _skeyend}, []}),

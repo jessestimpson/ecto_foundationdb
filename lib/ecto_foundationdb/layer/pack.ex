@@ -65,7 +65,7 @@ defmodule EctoFoundationDB.Layer.Pack do
   """
   def primary_codec(tenant, source, id) do
     namespaced_tuple(source, @data_namespace, [encode_pk_for_key(id)])
-    |> then(&Tenant.primary_codec(tenant, &1))
+    |> then(&Tenant.primary_codec(tenant, &1, vs?(id)))
   end
 
   def primary_write_key_to_codec(tenant, key) when is_binary(key) do
@@ -75,7 +75,15 @@ defmodule EctoFoundationDB.Layer.Pack do
   end
 
   def primary_write_key_to_codec(tenant, tuple) do
-    Tenant.primary_codec(tenant, tuple)
+    Tenant.primary_codec(tenant, tuple, false)
+  end
+
+  def get_vs_from_primary_key_tuple(
+        {_prefix, _source, _namespace, {:versionstamp, commit_version, batch_order, user_version}}
+      ) do
+    # @todo: convert to integer, 8 byte, 2 byte, 2 byte
+    {commit_version, batch_order, user_version}
+    |> IO.inspect()
   end
 
   @doc """
@@ -162,6 +170,10 @@ defmodule EctoFoundationDB.Layer.Pack do
 
   def from_fdb_value(bin), do: :erlang.binary_to_term(bin)
 
+  def vs?({:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, _}), do: true
+  def vs?(_), do: false
+
+  def encode_pk_for_key(id = {:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, _}), do: id
   def encode_pk_for_key(id) when is_binary(id), do: id
   def encode_pk_for_key(id) when is_atom(id), do: {:utf8, "#{id}"}
   def encode_pk_for_key(id) when is_number(id), do: id

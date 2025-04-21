@@ -11,7 +11,10 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterSchema do
   alias EctoFoundationDB.Tenant
 
   @impl Ecto.Adapter.Schema
-  def autogenerate(:binary_id), do: Ecto.UUID.generate()
+  def autogenerate(:binary_id), do: fn _tx -> Ecto.UUID.generate() end
+
+  def autogenerate(:id),
+    do: fn tx -> {:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, :erlfdb.get_next_tx_id(tx)} end
 
   def autogenerate(type),
     do: raise("FoundationDB Adapter does not support autogenerating #{type}")

@@ -977,6 +977,9 @@ defmodule Ecto.Adapters.FoundationDB do
   defdelegate autogenerate(type), to: EctoAdapterSchema
 
   @impl Ecto.Adapter.Schema
+  defdelegate postprocess(data), to: EctoAdapterSchema
+
+  @impl Ecto.Adapter.Schema
   defdelegate insert_all(
                 adapter_meta,
                 schema_meta,

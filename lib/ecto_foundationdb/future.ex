@@ -111,6 +111,8 @@ defmodule EctoFoundationDB.Future do
 
   # Future: If there is a wrapping transaction with an `async_*` qualifier, the wait happens here
   def await_stream(futs) do
+    futs = Enum.to_list(futs)
+
     # important to maintain order of the input futures
     reffed_futures =
       for %__MODULE__{ref: ref, erlfdb_future: erlfdb_future} <- futs,

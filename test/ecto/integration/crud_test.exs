@@ -176,7 +176,7 @@ defmodule Ecto.Integration.CrudTest do
 
       # Operations inside a FoundationDB Adapter Transaction have the tenant applied
       # automatically.
-      user =
+      {ins_user, get_user} =
         TestRepo.transaction(
           fn ->
             {:ok, jesse} =
@@ -187,12 +187,13 @@ defmodule Ecto.Integration.CrudTest do
               %User{name: "Sarah"}
               |> TestRepo.insert()
 
-            TestRepo.get(User, jesse.id)
+            {jesse, TestRepo.get(User, jesse.id)}
           end,
           prefix: tenant
         )
 
-      assert user.name == "Jesse"
+      assert ins_user.__meta__.prefix != nil
+      assert get_user.name == "Jesse"
     end
   end
 

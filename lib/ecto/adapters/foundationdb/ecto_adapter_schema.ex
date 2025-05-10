@@ -10,14 +10,28 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterSchema do
   alias EctoFoundationDB.Schema
   alias EctoFoundationDB.Tenant
 
-  @impl Ecto.Adapter.Schema
-  def autogenerate(:binary_id), do: fn _tx -> Ecto.UUID.generate() end
+  alias Ecto.Adapters.FoundationDB
 
-  def autogenerate(:id),
-    do: fn tx -> {:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, :erlfdb.get_next_tx_id(tx)} end
+  @impl Ecto.Adapter.Schema
+  def autogenerate(:binary_id), do: Ecto.UUID.generate()
+
+  def autogenerate(:id) do
+    # @todo: Ecto does not run this inside a transaction, so we tried using a function to generate the versionstamp.
+    # However, if we do that then we can't apply the completed versionstamp in the postprocess because we don't
+    # have access to the generated user version. Argh!
+    true = Tx.in_tx?()
+    {:ok, fn tx -> {:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, :erlfdb.get_next_tx_id(tx)} end}
+  end
 
   def autogenerate(type),
     do: raise("FoundationDB Adapter does not support autogenerating #{type}")
+
+  @impl Ecto.Adapter.Schema
+  def postprocess(data) do
+    data
+    |> attach_prefix!()
+    |> resolve_versionstamp!()
+  end
 
   @impl Ecto.Adapter.Schema
   def insert_all(
@@ -185,5 +199,36 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterSchema do
       {true, tenant = %Tenant{}} ->
         Map.put(schema_meta, :prefix, tenant)
     end
+  end
+
+  defp attach_prefix!(map) when is_map(map) do
+    case Map.get(map, :__meta__) do
+      nil ->
+        map
+
+      meta ->
+        case Map.get(meta, :prefix) do
+          nil ->
+            case Tx.in_tenant_tx?() do
+              {true, tenant} ->
+                FoundationDB.usetenant(map, tenant)
+
+              _ ->
+                raise """
+                EctoFoundationDB requires a prefix to be set in the schema metadata. \
+                If you've reached this error, then EctoFDB has a bug. Please report it.
+                """
+            end
+
+          _ ->
+            map
+        end
+    end
+  end
+
+  defp attach_prefix!(data), do: data
+
+  defp resolve_versionstamp!(data) do
+    data
   end
 end

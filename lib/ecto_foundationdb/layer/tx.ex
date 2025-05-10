@@ -124,7 +124,7 @@ defmodule EctoFoundationDB.Layer.Tx do
 
     assert_conflict_target!(options)
 
-    read_before_write = options[:conflict_target] === []
+    read_before_write = options[:conflict_target] !== []
 
     entries
     |> Stream.map(&TxInsert.insert_one(tx_insert, tx, &1, read_before_write))
@@ -308,7 +308,7 @@ defmodule EctoFoundationDB.Layer.Tx do
           data_object: Pack.from_fdb_value(v)
         }
 
-      kvs ->
+      kvs when is_list(kvs) ->
         [kv] =
           kvs
           |> PrimaryKVCodec.stream_decode(tenant)

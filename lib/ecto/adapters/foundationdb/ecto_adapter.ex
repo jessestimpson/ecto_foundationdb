@@ -34,6 +34,10 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapter do
   end
 
   @impl Ecto.Adapter
+  def loaders(:id, :id) do
+    [&load_id/1]
+  end
+
   def loaders(_primitive_type, ecto_type) do
     [ecto_type]
   end
@@ -41,5 +45,17 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapter do
   @impl Ecto.Adapter
   def dumpers(_primitive_type, ecto_type) do
     [ecto_type]
+  end
+
+  defp load_id({:ok, fun}) when is_function(fun, 1) do
+    {:ok, fun}
+  end
+
+  defp load_id(value) do
+    load_default(:id, value)
+  end
+
+  defp load_default(type, val) do
+    Ecto.Type.load(type, val, &Ecto.Type.adapter_load(__MODULE__, &1, &2))
   end
 end

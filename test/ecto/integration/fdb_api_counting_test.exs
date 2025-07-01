@@ -92,7 +92,7 @@ defmodule Ecto.Integration.FdbApiCountingTest do
              {EctoFoundationDB.Future, :wait_for_all_interleaving},
 
              # primary write
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
 
              # index write
              {EctoFoundationDB.Indexer.Default, :set}
@@ -127,7 +127,7 @@ defmodule Ecto.Integration.FdbApiCountingTest do
              {EctoFoundationDB.Future, :wait_for_all_interleaving},
 
              # primary write, index write
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
              {EctoFoundationDB.Indexer.Default, :set}
            ] == calls
   end
@@ -166,7 +166,7 @@ defmodule Ecto.Integration.FdbApiCountingTest do
              {EctoFoundationDB.Future, :wait_for_all_interleaving},
 
              # primary write, index write
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
              {EctoFoundationDB.Indexer.Default, :set},
 
              # wait for app metadata version and claim_key
@@ -201,7 +201,7 @@ defmodule Ecto.Integration.FdbApiCountingTest do
              {EctoFoundationDB.Future, :wait_for_all_interleaving},
 
              # primary write, index write
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
              {EctoFoundationDB.Indexer.Default, :set}
            ] == calls
   end
@@ -395,11 +395,11 @@ defmodule Ecto.Integration.FdbApiCountingTest do
              {EctoFoundationDB.Future, :wait_for_all_interleaving},
 
              # primary write
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
 
              # multikey writes
-             {EctoFoundationDB.Layer.TxInsert, :set},
-             {EctoFoundationDB.Layer.TxInsert, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set},
 
              # index write
              {EctoFoundationDB.Indexer.Default, :set}

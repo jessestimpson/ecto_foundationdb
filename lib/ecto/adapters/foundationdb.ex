@@ -849,6 +849,13 @@ defmodule Ecto.Adapters.FoundationDB do
   @impl Ecto.Adapter
   defmacro __before_compile__(_env) do
     quote do
+      def transactional(tenant, fun), do: Ecto.Adapters.FoundationDB.transactional(tenant, fun)
+
+      def async_insert_all!(schema, list, opts \\ []) do
+        repo = get_dynamic_repo()
+        EctoAdapterAsync.async_insert_all!(__MODULE__, repo, schema, list, opts)
+      end
+
       def async_all_range(queryable, id_s, id_e, opts \\ []) do
         async_query(fn ->
           repo = get_dynamic_repo()

@@ -12,6 +12,7 @@ given node.
 * Metadata cache now makes use of FoundationDB's `\xff/metadataVersion` key,
 which allows the client to cache metadata and maintain transactional isolation
 without having to wait on any keys.
+* Added support for versionstamping. Indexes on versionstamped keys are *not yet* supported.
 
 ### Breaking changes
 

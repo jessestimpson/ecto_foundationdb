@@ -168,6 +168,17 @@ defmodule EctoFoundationDB.Tenant do
     :erlfdb_tuple.pack(tuple)
   end
 
+  @doc """
+  Packs an Elixir tuple having an incomplete versionstamp into an FDB-encoded Tuple.
+
+  Caller should proceed to use `:erlfdb.set_versionstamped_key` or `:erlfdb.set_versionstamped_value`
+  as needed.
+  """
+  def pack_vs(tenant, tuple) when is_tuple(tuple) do
+    tuple = tenant.backend.extend_tuple(tuple, tenant.meta)
+    :erlfdb_tuple.pack_vs(tuple)
+  end
+
   def primary_codec(tenant, tuple, vs \\ false) when is_tuple(tuple) do
     tuple = tenant.backend.extend_tuple(tuple, tenant.meta)
     PrimaryKVCodec.new(tuple, vs)

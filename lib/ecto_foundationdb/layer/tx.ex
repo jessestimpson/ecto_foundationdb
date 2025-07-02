@@ -22,6 +22,7 @@ defmodule EctoFoundationDB.Layer.Tx do
   end
 
   def in_tx?(), do: not is_nil(Process.get(@tx))
+  def get(), do: Process.get(@tx)
 
   def safe?(nil) do
     case in_tenant_tx?() do

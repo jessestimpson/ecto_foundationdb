@@ -46,10 +46,18 @@ defmodule EctoFoundationDB.Future do
 
   def ref(%__MODULE__{ref: ref}), do: ref
 
-  def new_watch(erlfdb_future, handler \\ &Function.identity/1) do
-    # The future for a watch is fulfilled outside of a transaction, so there is no tx val
+  @doc """
+  Creates a Future that will be resolved outside of the transaction in which it was created.
+
+  Used for:
+
+    - watch
+    - versionstamp
+  """
+  def new_deferred(erlfdb_future, handler \\ &Function.identity/1) do
+    # The future for a watch and versionstamp is fulfilled outside of a transaction, so there is no tx val
     %__MODULE__{
-      tx: :watch,
+      tx: :deferred,
       ref: get_ref(erlfdb_future),
       erlfdb_future: erlfdb_future,
       handler: handler,
@@ -79,7 +87,7 @@ defmodule EctoFoundationDB.Future do
     f.(fut.result)
   end
 
-  def result(fut = %__MODULE__{tx: :watch}) do
+  def result(fut = %__MODULE__{tx: :deferred}) do
     %__MODULE__{erlfdb_future: erlfdb_future, handler: handler} = fut
     res = :erlfdb.wait(erlfdb_future)
     handler.(res)

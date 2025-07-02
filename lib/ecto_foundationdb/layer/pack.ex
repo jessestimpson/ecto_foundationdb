@@ -11,6 +11,7 @@ defmodule EctoFoundationDB.Layer.Pack do
   # Schema migrations are stored as primary writes and default indexes with
   #     {@migration_prefix, source, ...}
 
+  alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Tenant
 
   @adapter_prefix <<0xFD>>
@@ -78,12 +79,18 @@ defmodule EctoFoundationDB.Layer.Pack do
     Tenant.primary_codec(tenant, tuple, false)
   end
 
-  def get_vs_from_primary_key_tuple(
-        {_prefix, _source, _namespace, {:versionstamp, commit_version, batch_order, user_version}}
-      ) do
-    # @todo: convert to integer, 8 byte, 2 byte, 2 byte
-    {commit_version, batch_order, user_version}
-    |> IO.inspect()
+  def get_vs_from_key_tuple(key_tuple) do
+    case Kernel.elem(key_tuple, tuple_size(key_tuple) - 1) do
+      vs = {:versionstamp, _, _, _} ->
+        vs
+
+      _ ->
+        raise Unsupported, """
+        Versionstamp must be the last element of the key tuple. Instead we found
+
+        #{inspect(key_tuple)}
+        """
+    end
   end
 
   @doc """
@@ -112,11 +119,18 @@ defmodule EctoFoundationDB.Layer.Pack do
     {"\\xFD", "my-source", "i", "my-index", 1, "my-val", "my-id"}
   """
   def default_index_pack(tenant, source, index_name, idx_len, index_values, id) do
-    vals =
-      ["#{index_name}", idx_len] ++
-        index_values ++ if(is_nil(id), do: [], else: [encode_pk_for_key(id)])
-
+    vals = default_index_pack_vals(index_name, idx_len, index_values, id)
     namespaced_pack(tenant, source, @index_namespace, vals)
+  end
+
+  def default_index_pack_vs(tenant, source, index_name, idx_len, index_values, id) do
+    vals = default_index_pack_vals(index_name, idx_len, index_values, id)
+    namespaced_pack_vs(tenant, source, @index_namespace, vals)
+  end
+
+  defp default_index_pack_vals(index_name, idx_len, index_values, id) do
+    ["#{index_name}", idx_len] ++
+      index_values ++ if(is_nil(id), do: [], else: [encode_pk_for_key(id)])
   end
 
   def default_index_range(tenant, source, index_name) do
@@ -141,6 +155,11 @@ defmodule EctoFoundationDB.Layer.Pack do
   def namespaced_pack(tenant, source, namespace, vals) do
     namespaced_tuple(source, namespace, vals)
     |> then(&Tenant.pack(tenant, &1))
+  end
+
+  def namespaced_pack_vs(tenant, source, namespace, vals) do
+    namespaced_tuple(source, namespace, vals)
+    |> then(&Tenant.pack_vs(tenant, &1))
   end
 
   defp namespaced_tuple(source, namespace, vals) when is_list(vals) do
@@ -173,7 +192,7 @@ defmodule EctoFoundationDB.Layer.Pack do
   def vs?({:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, _}), do: true
   def vs?(_), do: false
 
-  def encode_pk_for_key(id = {:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, _}), do: id
+  def encode_pk_for_key(id = {:versionstamp, _, _, _}), do: id
   def encode_pk_for_key(id) when is_binary(id), do: id
   def encode_pk_for_key(id) when is_atom(id), do: {:utf8, "#{id}"}
   def encode_pk_for_key(id) when is_number(id), do: id

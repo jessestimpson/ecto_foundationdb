@@ -1,6 +1,8 @@
 defmodule Ecto.Bench.User do
   use Ecto.Schema
 
+  @primary_key {:id, :id, autogenerate: false}
+
   schema "users" do
     field(:name, :string)
     field(:email, :string)
@@ -30,7 +32,7 @@ defmodule Ecto.Bench.User do
   end
 
   def sample_data do
-    %{
+    %__MODULE__{
       name: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
       email: "foobar@email.com",
       password: "mypass",
@@ -44,6 +46,8 @@ end
 
 defmodule Ecto.Bench.Game do
   use Ecto.Schema
+
+  @primary_key {:id, :id, autogenerate: false}
 
   schema "games" do
     field(:name, :string)

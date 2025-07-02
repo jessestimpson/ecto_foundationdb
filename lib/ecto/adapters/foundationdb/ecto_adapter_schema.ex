@@ -2,8 +2,8 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterSchema do
   @moduledoc false
   @behaviour Ecto.Adapter.Schema
 
-  alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Exception.IncorrectTenancy
+  alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
   alias EctoFoundationDB.Layer.Fields
   alias EctoFoundationDB.Layer.Metadata

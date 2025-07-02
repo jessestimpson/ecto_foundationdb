@@ -2,8 +2,8 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
   @moduledoc false
   alias Ecto.Adapters.FoundationDB
   alias EctoFoundationDB.Exception.Unsupported
-  alias EctoFoundationDB.Layer.Fields
   alias EctoFoundationDB.Future
+  alias EctoFoundationDB.Layer.Fields
   alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.Tx
   alias EctoFoundationDB.Versionstamp
@@ -35,19 +35,7 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
     vs_future = Versionstamp.get(tx)
 
     Future.apply(vs_future, fn vs ->
-      Enum.map(result, fn x ->
-        pk = Map.get(x, pk_field)
-
-        x =
-          if Pack.vs?(pk) do
-            pk = Versionstamp.resolve(Map.get(x, pk_field), vs)
-            Map.put(x, pk_field, pk)
-          else
-            x
-          end
-
-        FoundationDB.usetenant(x, tenant)
-      end)
+      Enum.map(result, &resolve_versionstamp(tenant, &1, vs, pk_field))
     end)
   end
 
@@ -90,5 +78,19 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
         query = from(_ in source, select: ^select_fields)
         repo.all(query, noop: data_result)
     end
+  end
+
+  defp resolve_versionstamp(tenant, x, vs, pk_field) do
+    pk = Map.get(x, pk_field)
+
+    x =
+      if Pack.vs?(pk) do
+        pk = Versionstamp.resolve(Map.get(x, pk_field), vs)
+        Map.put(x, pk_field, pk)
+      else
+        x
+      end
+
+    FoundationDB.usetenant(x, tenant)
   end
 end

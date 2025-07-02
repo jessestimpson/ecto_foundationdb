@@ -1,4 +1,8 @@
 defmodule EctoFoundationDB.Versionstamp do
+  @moduledoc """
+  Versionstamping is a feature that allows you to create a unique identifier for a record
+  that is guaranteed to be unique across all records in the database.
+  """
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
   alias EctoFoundationDB.Layer.Tx
@@ -37,7 +41,7 @@ defmodule EctoFoundationDB.Versionstamp do
     """
   end
 
-  def to_integer({:versionstamp, _, _, _} = vs) do
+  def to_integer(vs = {:versionstamp, _, _, _}) do
     <<@vs96, bin::binary>> = :erlfdb_tuple.pack({vs})
     :binary.decode_unsigned(bin, :big)
   end

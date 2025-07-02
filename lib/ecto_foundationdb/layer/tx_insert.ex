@@ -1,8 +1,8 @@
 defmodule EctoFoundationDB.Layer.TxInsert do
   @moduledoc false
   alias EctoFoundationDB.Exception.Unsupported
-  alias EctoFoundationDB.Indexer
   alias EctoFoundationDB.Future
+  alias EctoFoundationDB.Indexer
   alias EctoFoundationDB.Layer.DecodedKV
   alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.PrimaryKVCodec

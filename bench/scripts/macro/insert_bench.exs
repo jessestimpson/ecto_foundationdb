@@ -24,11 +24,17 @@ tenant = Tenant.open!(Ecto.Bench.FdbRepo, "bench")
 
 inputs = %{
   "Struct" => struct(User, User.sample_data()),
-  "Changeset" => User.changeset(User.sample_data())
+  #"Changeset" => User.changeset(User.sample_data())
 }
 
 jobs = %{
-  "Fdb Insert" => fn entry -> Ecto.Bench.FdbRepo.insert!(entry, prefix: tenant) end
+  "Fdb Insert" => fn entry ->
+    f = Ecto.Bench.FdbRepo.transactional(tenant, fn ->
+      Ecto.Bench.FdbRepo.async_insert_all!(User, [entry])
+    end)
+    [record] = Ecto.Bench.FdbRepo.await(f)
+    record
+  end
 }
 
 path = System.get_env("BENCHMARKS_OUTPUT_PATH") || "bench/results"

@@ -44,7 +44,7 @@ jobs = %{
 }
 
 path = System.get_env("BENCHMARKS_OUTPUT_PATH") || "bench/results"
-file = Path.join(path, "load.json")
+_file = Path.join(path, "load.json")
 
 Benchee.run(
   jobs,

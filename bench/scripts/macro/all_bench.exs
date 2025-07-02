@@ -19,6 +19,7 @@
 Code.require_file("../../support/setup.exs", __DIR__)
 
 alias Ecto.Bench.User
+alias EctoFoundationDB.Tenant
 
 limit = 5_000
 
@@ -29,7 +30,10 @@ users =
   |> Enum.map(fn _ -> User.sample_data() end)
 
 # We need to insert data to fetch
-Ecto.Bench.FdbRepo.insert_all(User, users, prefix: tenant)
+f = Ecto.Bench.FdbRepo.transactional(tenant, fn ->
+  Ecto.Bench.FdbRepo.async_insert_all!(User, users)
+end)
+Ecto.Bench.FdbRepo.await(f)
 
 jobs = %{
   "Fdb Repo.all/2" => fn -> Ecto.Bench.FdbRepo.all(User, limit: limit, prefix: tenant) end,

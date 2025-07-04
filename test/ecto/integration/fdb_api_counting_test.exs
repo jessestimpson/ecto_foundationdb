@@ -309,13 +309,13 @@ defmodule Ecto.Integration.FdbApiCountingTest do
 
     {calls, _} =
       with_erlfdb_calls(context.test, fn ->
-        TestRepo.transaction(
+        TestRepo.transactional(
+          tenant,
           fn ->
             f1 = TestRepo.async_get_by(User, name: "Alice")
             f2 = TestRepo.async_get_by(User, name: "Bob")
             TestRepo.await([f1, f2])
-          end,
-          prefix: tenant
+          end
         )
       end)
 

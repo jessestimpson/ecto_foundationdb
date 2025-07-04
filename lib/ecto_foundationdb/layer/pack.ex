@@ -13,6 +13,7 @@ defmodule EctoFoundationDB.Layer.Pack do
 
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Tenant
+  alias EctoFoundationDB.Versionstamp
 
   @adapter_prefix <<0xFD>>
   @migration_prefix <<0xFE>>
@@ -66,7 +67,7 @@ defmodule EctoFoundationDB.Layer.Pack do
   """
   def primary_codec(tenant, source, id) do
     namespaced_tuple(source, @data_namespace, [encode_pk_for_key(id)])
-    |> then(&Tenant.primary_codec(tenant, &1, vs?(id)))
+    |> then(&Tenant.primary_codec(tenant, &1, Versionstamp.incomplete?(id)))
   end
 
   def primary_write_key_to_codec(tenant, key) when is_binary(key) do
@@ -188,9 +189,6 @@ defmodule EctoFoundationDB.Layer.Pack do
   def to_fdb_value(fields), do: :erlang.term_to_binary(fields)
 
   def from_fdb_value(bin), do: :erlang.binary_to_term(bin)
-
-  def vs?({:versionstamp, 0xFFFFFFFFFFFFFFFF, 0xFFFF, _}), do: true
-  def vs?(_), do: false
 
   def encode_pk_for_key(id = {:versionstamp, _, _, _}), do: id
   def encode_pk_for_key(id) when is_binary(id), do: id

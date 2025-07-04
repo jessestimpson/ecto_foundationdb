@@ -5,6 +5,7 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
   alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Options
   alias EctoFoundationDB.Tenant
+  alias EctoFoundationDB.Versionstamp
 
   defstruct [:tuple, :vs?]
 
@@ -211,7 +212,7 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
     [{pk_field, stored_pk} | data_object_rest] = data_object
 
     # When incomplete versionstamp is stored on in the value, we need to retrieve the pk from the key
-    if Pack.vs?(stored_pk) do
+    if Versionstamp.incomplete?(stored_pk) do
       [{pk_field, Pack.get_vs_from_key_tuple(key_tuple)} | data_object_rest]
     else
       data_object

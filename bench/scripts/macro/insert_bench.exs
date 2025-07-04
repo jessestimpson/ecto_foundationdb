@@ -23,7 +23,7 @@ alias EctoFoundationDB.Tenant
 tenant = Tenant.open!(Ecto.Bench.FdbRepo, "bench")
 
 inputs = %{
-  "Struct" => struct(User, User.sample_data()),
+  "Struct" => User.sample_data(),
   #"Changeset" => User.changeset(User.sample_data())
 }
 
@@ -34,7 +34,8 @@ jobs = %{
     end)
     [record] = Ecto.Bench.FdbRepo.await(f)
     record
-  end
+  end,
+  "Pg Insert" => fn entry -> Ecto.Bench.PgRepo.insert!(entry) end
 }
 
 path = System.get_env("BENCHMARKS_OUTPUT_PATH") || "bench/results"

@@ -4,7 +4,6 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
   alias EctoFoundationDB.Layer.Fields
-  alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.Tx
   alias EctoFoundationDB.Versionstamp
   import Ecto.Query
@@ -13,24 +12,49 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
     {tx?, tenant} = Tx.in_tenant_tx?()
 
     if not tx?,
-      do: raise(Unsupported, "async_insert_all! must be called within a transaction")
+      do: raise(Unsupported, "`Repo.async_insert_all!` must be called within a transaction")
 
     pk_field = Fields.get_pk_field!(schema)
 
     tx = Tx.get()
 
-    result =
+    forced_no_conflict? = [] == Keyword.get(opts, :conflict_target)
+
+    list =
       for x <- list do
-        # If field is type :id and passed in as null, generate a new versionstamp
+        if not is_struct(x, schema) do
+          raise Unsupported, """
+          `Repo.async_insert_all!` must be called with a list of Ecto.Schema structs
+          """
+        end
+
+        pk = Map.get(x, pk_field)
+
         x =
-          if is_nil(Map.get(x, pk_field)) and schema.__schema__(:type, pk_field) == :id do
+          if is_nil(pk) and
+               schema.__schema__(:type, pk_field) == :id do
             Map.put(x, pk_field, Versionstamp.next(tx))
           else
             x
           end
 
-        repo.insert!(x, opts)
+        pk = Map.get(x, pk_field)
+
+        if not forced_no_conflict? and not Versionstamp.incomplete?(pk) do
+          raise Unsupported, """
+          `Repo.async_insert_all!` is designed to be called with either
+
+          1. A list of Ecto.Schema structs with incomplete Versionstamp in the `:id` field
+          2. The option `conflict_target: []`. (Make sure you understand the implications of this option)
+          """
+        end
+
+        x
       end
+
+    # The insert_all function does not return the structs, so instead we make sure individual calls to `insert!` are
+    # non-blocking by enforcing Versionstamps or conflict_target == []
+    result = for x <- list, do: repo.insert!(x, opts)
 
     vs_future = Versionstamp.get(tx)
 
@@ -84,7 +108,7 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
     pk = Map.get(x, pk_field)
 
     x =
-      if Pack.vs?(pk) do
+      if Versionstamp.incomplete?(pk) do
         pk = Versionstamp.resolve(Map.get(x, pk_field), vs)
         Map.put(x, pk_field, pk)
       else

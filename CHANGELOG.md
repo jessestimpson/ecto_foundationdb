@@ -20,6 +20,12 @@ without having to wait on any keys.
   number primary key is now encoded in the FDB key with the Tuple layer. All other types remain encoded with term_to_binary.
   If you need help upgrading your database, please put in a GitHub Issue.
 
+### Deprecations
+
+* Ecto has deprecated `Repo.transaction` in favor of `Repo.transact`. Since this decision doesn't align with FoundationDB's view of
+transactions, we have chosen to deprecate `Repo.transaction` in favor of `Repo.transactional`. This terminology better aligns with
+`:erlfdb` and provides a distinction from RDBMS transactions.
+
 ### New documentation
 
 * [Guide for Operators](operators_manual.html): Describes how to use the `EctoFoundationDB.CLI` functions to rename a field while guaraneeting that all

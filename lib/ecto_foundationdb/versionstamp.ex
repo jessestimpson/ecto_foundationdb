@@ -2,6 +2,8 @@ defmodule EctoFoundationDB.Versionstamp do
   @moduledoc """
   Versionstamping is a feature that allows you to create a unique identifier for a record
   that is guaranteed to be unique across all records in the database.
+
+  Please refer to the documentation for `Repo.async_insert_all!/3`.
   """
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
@@ -17,6 +19,9 @@ defmodule EctoFoundationDB.Versionstamp do
     {:versionstamp, @inc_id, @inc_batch, user}
   end
 
+  def incomplete?({:versionstamp, @inc_id, @inc_batch, _}), do: true
+  def incomplete?(_), do: false
+
   def get(tx) do
     Future.new_deferred(:erlfdb.get_versionstamp(tx), &from_binary/1)
   end
@@ -30,14 +35,14 @@ defmodule EctoFoundationDB.Versionstamp do
         alias EctoFoundationDB.Future
         alias EctoFoundationDB.Versionstamp
 
-        {event, vs_future} = MyRepo.transaction(fn tx ->
+        {event, vs_future} = MyRepo.transactional(tenant, fn tx ->
           {:ok, event} = MyRepo.insert(%Event{id: Versionstamp.next(tx)})
           vs_future = Versionstamp.get(tx)
           {event, vs_future}
-        end, prefix: tenant)
+        end)
 
-        vs = Future.result(vs_future)
-        event = %{event | id: Versionstamp.resolve(event.id, )}
+        vs = MyRepo.await(vs_future)
+        event = %{event | id: Versionstamp.resolve(event.id, vs)}
     """
   end
 

@@ -67,17 +67,18 @@ defmodule Ecto.Integration.CrudTest do
 
       # Crossing a struct into another tenant is not allowed when using a transaction.
       assert_raise(IncorrectTenancy, ~r/original transaction context .* did not match/, fn ->
-        TestRepo.transaction(
+        TestRepo.transactional(
+          other_tenant,
           fn ->
             TestRepo.insert(user)
-          end,
-          prefix: other_tenant
+          end
         )
       end)
 
       # Here are 2 ways to force a struct into a different tenant's transaction
       assert :ok =
-               TestRepo.transaction(
+               TestRepo.transactional(
+                 other_tenant,
                  fn ->
                    # Specify the equivalent tenant
                    %User{user | id: nil}
@@ -90,8 +91,7 @@ defmodule Ecto.Integration.CrudTest do
                    |> TestRepo.insert()
 
                    :ok
-                 end,
-                 prefix: other_tenant
+                 end
                )
     end
 
@@ -177,7 +177,8 @@ defmodule Ecto.Integration.CrudTest do
       # Operations inside a FoundationDB Adapter Transaction have the tenant applied
       # automatically.
       {_ins_user, get_user} =
-        TestRepo.transaction(
+        TestRepo.transactional(
+          tenant,
           fn ->
             {:ok, jesse} =
               %User{name: "Jesse"}
@@ -188,8 +189,7 @@ defmodule Ecto.Integration.CrudTest do
               |> TestRepo.insert()
 
             {jesse, TestRepo.get(User, jesse.id)}
-          end,
-          prefix: tenant
+          end
         )
 
       # @todo: structs from inside a transaction don't inherit the prefix
@@ -204,13 +204,13 @@ defmodule Ecto.Integration.CrudTest do
 
       names = ~w/John James Jesse Sarah Bob Steve/
 
-      TestRepo.transaction(
+      TestRepo.transactional(
+        tenant,
         fn ->
           for n <- names do
             TestRepo.insert(%User{name: n})
           end
-        end,
-        prefix: tenant
+        end
       )
 
       assert [
@@ -297,13 +297,13 @@ defmodule Ecto.Integration.CrudTest do
 
       names = ~w/John James Jesse Sarah Bob Steve/
 
-      TestRepo.transaction(
+      TestRepo.transactional(
+        tenant,
         fn ->
           for n <- names do
             TestRepo.insert(%User{name: n})
           end
-        end,
-        prefix: tenant
+        end
       )
 
       # Each chunk of the stream is retrieved in a separate FDB transaction

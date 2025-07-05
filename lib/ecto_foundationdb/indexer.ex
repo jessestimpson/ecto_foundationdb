@@ -46,25 +46,25 @@ defmodule EctoFoundationDB.Indexer do
   def create(tenant, tx, idx, schema, range, limit),
     do: idx[:indexer].create(tenant, tx, idx, schema, range, limit)
 
-  def set(tenant, tx, metadata, schema, kv = {k, _}) do
+  def set(tenant, tx, metadata, schema, kv = {kv_codec, _}) do
     %Metadata{indexes: idxs, partial_indexes: partial_idxs} = metadata
-    idxs = idxs ++ filter_partials(partial_idxs, k, [])
+    idxs = idxs ++ filter_partials(partial_idxs, kv_codec.packed, [])
 
     for idx <- idxs,
         do: idx[:indexer].set(tenant, tx, idx, schema, kv)
   end
 
-  def clear(tenant, tx, metadata, schema, kv = {k, _}) do
+  def clear(tenant, tx, metadata, schema, kv = {kv_codec, _}) do
     %Metadata{indexes: idxs, partial_indexes: partial_idxs} = metadata
-    idxs = idxs ++ filter_partials(partial_idxs, k, [])
+    idxs = idxs ++ filter_partials(partial_idxs, kv_codec.packed, [])
 
     for idx <- idxs,
         do: idx[:indexer].clear(tenant, tx, idx, schema, kv)
   end
 
-  def update(tenant, tx, metadata, schema, kv = {k, _}, updates) do
+  def update(tenant, tx, metadata, schema, kv = {kv_codec, _}, updates) do
     %Metadata{indexes: idxs, partial_indexes: partial_idxs} = metadata
-    idxs = idxs ++ filter_partials(partial_idxs, k, [])
+    idxs = idxs ++ filter_partials(partial_idxs, kv_codec.packed, [])
 
     for idx <- idxs do
       apply(
@@ -127,11 +127,11 @@ defmodule EctoFoundationDB.Indexer do
     end
   end
 
-  defp __update(tenant, tx, idx, schema, kv = {k, v}, updates) do
+  defp __update(tenant, tx, idx, schema, kv = {kv_codec, v}, updates) do
     idx[:indexer].clear(tenant, tx, idx, schema, kv)
 
     kv =
-      {k,
+      {kv_codec,
        v
        |> Keyword.merge(updates[:set] || [])
        |> Keyword.drop(updates[:clear] || [])}

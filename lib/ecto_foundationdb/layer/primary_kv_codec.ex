@@ -7,12 +7,18 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
   alias EctoFoundationDB.Tenant
   alias EctoFoundationDB.Versionstamp
 
-  defstruct [:tuple, :vs?]
+  defstruct [:tuple, :vs?, :packed]
 
   @metadata_key :multikey
 
-  def new(tuple, vs \\ false) do
+  def new(tuple, vs \\ false)
+
+  def new(tuple, vs) when is_tuple(tuple) do
     %__MODULE__{tuple: tuple, vs?: vs}
+  end
+
+  def new(key, vs) when is_binary(key) do
+    %__MODULE__{packed: key, vs?: vs}
   end
 
   def vs?(%__MODULE__{vs?: vs?}), do: vs?
@@ -95,6 +101,19 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
       _ ->
         false
     end
+  end
+
+  def with_packed_key(kv_codec = %{packed: packed}) when not is_nil(packed), do: kv_codec
+
+  def with_packed_key(kv_codec) do
+    %{kv_codec | packed: pack_key(kv_codec, nil)}
+  end
+
+  def with_unpacked_tuple(kv_codec = %{tuple: tuple}, _tenant) when not is_nil(tuple),
+    do: kv_codec
+
+  def with_unpacked_tuple(kv_codec, tenant) do
+    %{kv_codec | tuple: Tenant.unpack(tenant, kv_codec.packed)}
   end
 
   def pack_key(kv_codec, t) do

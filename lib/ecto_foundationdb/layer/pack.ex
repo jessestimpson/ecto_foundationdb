@@ -60,9 +60,10 @@ defmodule EctoFoundationDB.Layer.Pack do
 
   ## Examples
 
+    iex> alias EctoFoundationDB.Layer.PrimaryKVCodec
     iex> tenant = %EctoFoundationDB.Tenant{backend: EctoFoundationDB.Tenant.ManagedTenant}
-    iex> kv_codec = EctoFoundationDB.Layer.Pack.primary_codec(tenant, "my-source", "my-id")
-    iex> EctoFoundationDB.Tenant.unpack(tenant, EctoFoundationDB.Layer.PrimaryKVCodec.pack_key(kv_codec, nil))
+    iex> %{packed: packed} = EctoFoundationDB.Layer.Pack.primary_codec(tenant, "my-source", "my-id") |> PrimaryKVCodec.with_packed_key()
+    iex> EctoFoundationDB.Tenant.unpack(tenant, packed)
     {"\\xFD", "my-source", "d", "my-id"}
   """
   def primary_codec(tenant, source, id) do

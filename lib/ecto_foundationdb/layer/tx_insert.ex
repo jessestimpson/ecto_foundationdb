@@ -65,10 +65,9 @@ defmodule EctoFoundationDB.Layer.TxInsert do
       PrimaryKVCodec.set_new_kvs(tx, kv_codec, kvs)
     end
 
-    # The indexer is not informed of the object splitting
-    fdb_key = PrimaryKVCodec.pack_key(kv_codec, nil)
+    kv_codec = PrimaryKVCodec.with_packed_key(kv_codec)
 
-    Indexer.set(tenant, tx, metadata, schema, {fdb_key, data_object})
+    Indexer.set(tenant, tx, metadata, schema, {kv_codec, data_object})
     :ok
   end
 

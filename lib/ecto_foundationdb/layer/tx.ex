@@ -214,7 +214,9 @@ defmodule EctoFoundationDB.Layer.Tx do
       :erlfdb.clear_range(tx, fdb_key, clear_end)
     end
 
-    Indexer.update(tenant, tx, metadata, schema, {fdb_key, orig_data_object}, updates)
+    kv_codec = PrimaryKVCodec.with_packed_key(kv_codec)
+
+    Indexer.update(tenant, tx, metadata, schema, {kv_codec, orig_data_object}, updates)
   end
 
   def delete_pks(tenant, tx, {schema, source, _context}, pk_futures, metadata) do
@@ -258,15 +260,16 @@ defmodule EctoFoundationDB.Layer.Tx do
       ) do
     %DecodedKV{codec: kv_codec, data_object: v} = decoded_kv
 
-    {start_key, end_key} = PrimaryKVCodec.range(kv_codec)
+    kv_codec = %{packed: key} = PrimaryKVCodec.with_packed_key(kv_codec)
 
     if decoded_kv.multikey? do
+      {start_key, end_key} = PrimaryKVCodec.range(kv_codec)
       :erlfdb.clear_range(tx, start_key, end_key)
     else
-      :erlfdb.clear(tx, start_key)
+      :erlfdb.clear(tx, key)
     end
 
-    Indexer.clear(tenant, tx, metadata, schema, {start_key, v})
+    Indexer.clear(tenant, tx, metadata, schema, {kv_codec, v})
   end
 
   def clear_all(tenant, tx, %{opts: _adapter_opts}, source) do
@@ -284,8 +287,9 @@ defmodule EctoFoundationDB.Layer.Tx do
       raise Unsupported, "Watches on schemas with `write_primary: false` are not supported."
     end
 
-    kv_codec = Pack.primary_codec(tenant, source, pk)
-    key = PrimaryKVCodec.pack_key(kv_codec, nil)
+    %{packed: key} =
+      Pack.primary_codec(tenant, source, pk)
+      |> PrimaryKVCodec.with_packed_key()
 
     fut = :erlfdb.watch(tx, key)
     fut

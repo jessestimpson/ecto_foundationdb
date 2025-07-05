@@ -3,6 +3,7 @@ defmodule EctoFoundationDB.Indexer.Default do
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Indexer
   alias EctoFoundationDB.Layer.Pack
+  alias EctoFoundationDB.Layer.PrimaryKVCodec
   alias EctoFoundationDB.QueryPlan
   alias EctoFoundationDB.Schema
 
@@ -158,10 +159,21 @@ defmodule EctoFoundationDB.Indexer.Default do
       tx
       |> :erlfdb.get_range(start_key, end_key, limit: limit, wait: true)
       |> Enum.map(fn {fdb_key, fdb_value} ->
-        {index_key, index_object} =
-          get_index_entry(tenant, idx, schema, {fdb_key, Pack.from_fdb_value(fdb_value)})
+        # @todo: this won't work for multikey objects, need to stream_decode.. but I'm not guaranteed to have
+        # the full set of keys.
+        kv_codec =
+          PrimaryKVCodec.new(fdb_key)
+          |> PrimaryKVCodec.with_unpacked_tuple(tenant)
 
-        :erlfdb.set(tx, index_key, index_object)
+        entry =
+          get_index_entry(
+            tenant,
+            idx,
+            schema,
+            {kv_codec, Pack.from_fdb_value(fdb_value)}
+          )
+
+        set_index_entry(tx, entry)
         fdb_key
       end)
 
@@ -179,14 +191,31 @@ defmodule EctoFoundationDB.Indexer.Default do
 
   @impl true
   def set(tenant, tx, idx, schema, kv) do
-    {index_key, index_object} = get_index_entry(tenant, idx, schema, kv)
-    :erlfdb.set(tx, index_key, index_object)
+    entry = get_index_entry(tenant, idx, schema, kv)
+    set_index_entry(tx, entry)
     :ok
+  end
+
+  defp set_index_entry(tx, {index_key, kv_codec = %PrimaryKVCodec{}, false, true}) do
+    :erlfdb.set(tx, index_key, kv_codec.packed)
+  end
+
+  defp set_index_entry(tx, {index_key, kv_codec = %PrimaryKVCodec{}, true, true}) do
+    :erlfdb.set_versionstamped_value(tx, index_key, kv_codec.packed)
+  end
+
+  defp set_index_entry(tx, {index_key, index_object, true, false}) when is_binary(index_object) do
+    :erlfdb.set_versionstamped_key(tx, index_key, index_object)
+  end
+
+  defp set_index_entry(tx, {index_key, index_object, false, false})
+       when is_binary(index_object) do
+    :erlfdb.set(tx, index_key, index_object)
   end
 
   @impl true
   def clear(tenant, tx, idx, schema, kv) do
-    {index_key, _index_object} = get_index_entry(tenant, idx, schema, kv)
+    {index_key, _index_object, _, _} = get_index_entry(tenant, idx, schema, kv)
 
     :erlfdb.clear(tx, index_key)
     :ok
@@ -246,7 +275,7 @@ defmodule EctoFoundationDB.Indexer.Default do
   end
 
   # Note: pk is always first. See insert and update paths
-  defp get_index_entry(tenant, idx, schema, {fdb_key, data_object = [{pk_field, pk_value} | _]}) do
+  defp get_index_entry(tenant, idx, schema, {kv_codec, data_object = [{pk_field, pk_value} | _]}) do
     index_name = idx[:id]
     index_fields = idx[:fields]
     index_options = idx[:options]
@@ -261,6 +290,22 @@ defmodule EctoFoundationDB.Indexer.Default do
         indexkey_encoder(Keyword.get(data_object, idx_field), types[idx_field])
       end
 
+    # FDB API doesn't support setting the versionstamp on both the key and value in the
+    # same transaction. So, we must choose either the key or the value of the index entry.
+    # However, we're forced to choose the value to have the versionstamp so that
+    # get_mapped_range works correctly. Therefore, we must generate a unique identifier
+    # for the key of the index entry. As long as it's unique, it doesn't actually matter
+    # what it is, since index entries are always obtained with get_range calls on portions of the
+    # key before the pk and the key is always ignored anyway by get_mapped_range.
+    #
+    # Exception: when mapped? is false, the index entry becomes the primary write, so we
+    # must use set_versionstamped_key.
+    vs? = PrimaryKVCodec.vs?(kv_codec)
+    mapped? = Keyword.get(index_options, :mapped?, true)
+
+    pk_value =
+      if mapped? and vs?, do: Ecto.UUID.generate(), else: pk_value
+
     index_key =
       Pack.default_index_pack(
         tenant,
@@ -271,11 +316,11 @@ defmodule EctoFoundationDB.Indexer.Default do
         pk_value
       )
 
-    if Keyword.get(index_options, :mapped?, true) do
-      {index_key, fdb_key}
+    if mapped? do
+      {index_key, kv_codec, vs?, mapped?}
     else
       # unmapped index values do not support key/value splitting
-      {index_key, Pack.to_fdb_value(data_object)}
+      {index_key, Pack.to_fdb_value(data_object), vs?, mapped?}
     end
   end
 

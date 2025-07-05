@@ -1,7 +1,8 @@
 defmodule Ecto.Bench.User do
   use Ecto.Schema
+  alias EctoFoundationDB.Versionstamp
 
-  @primary_key {:id, :id, autogenerate: false}
+  @primary_key {:id, Versionstamp, autogenerate: false}
 
   schema "users" do
     field(:name, :string)
@@ -47,7 +48,9 @@ end
 defmodule Ecto.Bench.Game do
   use Ecto.Schema
 
-  @primary_key {:id, :id, autogenerate: false}
+  alias EctoFoundationDB.Versionstamp
+
+  @primary_key {:id, Versionstamp, autogenerate: false}
 
   schema "games" do
     field(:name, :string)

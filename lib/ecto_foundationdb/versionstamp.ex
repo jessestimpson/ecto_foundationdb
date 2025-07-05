@@ -5,6 +5,8 @@ defmodule EctoFoundationDB.Versionstamp do
 
   Please refer to the documentation for `Repo.async_insert_all!/3`.
   """
+  use Ecto.Type
+
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
   alias EctoFoundationDB.Layer.Tx
@@ -79,4 +81,19 @@ defmodule EctoFoundationDB.Versionstamp do
   def resolve({:versionstamp, @inc_id, @inc_batch, user}, {:versionstamp, id, batch}) do
     {:versionstamp, id, batch, user}
   end
+
+  @impl true
+  def type(), do: :id
+
+  @impl true
+  def cast(id) when is_integer(id), do: {:ok, from_integer(id)}
+  def cast(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
+  def cast(id_str) when is_binary(id_str), do: Ecto.Type.cast(:id, id_str)
+  def cast(_), do: :error
+
+  @impl true
+  def dump(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
+
+  @impl true
+  def load(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
 end

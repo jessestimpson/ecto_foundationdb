@@ -3,7 +3,9 @@ defmodule EctoFoundationDB.Schemas.QueueItem do
 
   use Ecto.Schema
 
-  @primary_key {:id, :id, autogenerate: false}
+  alias EctoFoundationDB.Versionstamp
+
+  @primary_key {:id, Versionstamp, autogenerate: false}
 
   schema "queue" do
     field(:data, :binary)

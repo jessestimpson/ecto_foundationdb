@@ -118,6 +118,8 @@ defmodule Ecto.Integration.VersionstampTest do
     # top
     assert [%QueueItem{id: ^id_a}] = TestRepo.all(QueueItem, limit: 1, prefix: tenant)
 
+    assert %QueueItem{} = TestRepo.get!(QueueItem, id_a, prefix: tenant)
+
     # pop (and top comes for free)
     top =
       TestRepo.transactional(tenant, fn ->

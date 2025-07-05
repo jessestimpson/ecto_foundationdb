@@ -106,10 +106,6 @@ defmodule EctoFoundationDB.Layer.Pack do
     namespaced_range(tenant, source, @data_namespace, [])
   end
 
-  def primary_mapper(tenant) do
-    Tenant.primary_mapper(tenant)
-  end
-
   @doc """
   We assume index_values are already encoded as binaries
 

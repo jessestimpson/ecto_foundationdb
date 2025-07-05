@@ -32,7 +32,7 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
 
         x =
           if is_nil(pk) and
-               schema.__schema__(:type, pk_field) == :id do
+               schema.__schema__(:type, pk_field) == Versionstamp do
             Map.put(x, pk_field, Versionstamp.next(tx))
           else
             x

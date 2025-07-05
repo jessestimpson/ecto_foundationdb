@@ -451,9 +451,14 @@ defmodule Ecto.Adapters.FoundationDB do
   Versionstamps are guaranteed to be unique and increasing along with the total order of the serializable transactions.
   They are not guaranteed to increment by exactly one.
 
-  To use Versionstamps, your Schema must have a primary key field of type `:id`. The easiest way to insert such records
-  is by using `Repo.async_insert_all/3`. This function follows a different approach than the other `Repo.async_*` functions;
-  the future must be awaited *outside* of the transaction.
+  To use Versionstamps, your Schema must have a primary key field of type `Versionstamp`, with `autogenerate: false`.
+
+  ```elixir
+  @primary_key {:id, EctoFoundationDB.Versionstamp, autogenerate: false}
+  ```
+
+  The easiest way to insert such records is by using `Repo.async_insert_all/3`. This function follows a different
+  approach than the other `Repo.async_*` functions; the future must be awaited *outside* of the transaction.
 
   ```elixir
   future = MyApp.Repo.transactional(tenant, fn ->

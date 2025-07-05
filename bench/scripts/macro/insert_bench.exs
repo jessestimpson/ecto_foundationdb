@@ -34,8 +34,7 @@ jobs = %{
     end)
     [record] = Ecto.Bench.FdbRepo.await(f)
     record
-  end,
-  "Pg Insert" => fn entry -> Ecto.Bench.PgRepo.insert!(entry) end
+  end
 }
 
 path = System.get_env("BENCHMARKS_OUTPUT_PATH") || "bench/results"

@@ -36,7 +36,7 @@ end)
 Ecto.Bench.FdbRepo.await(f)
 
 jobs = %{
-  "Fdb Repo.all/2" => fn -> Ecto.Bench.FdbRepo.all(User, limit: limit, prefix: tenant) end,
+  "Fdb Repo.all/2" => fn -> Ecto.Bench.FdbRepo.all(User, limit: limit, prefix: tenant) end
 }
 
 path = System.get_env("BENCHMARKS_OUTPUT_PATH") || "bench/results"

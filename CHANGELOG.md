@@ -24,7 +24,7 @@ without having to wait on any keys.
 
 * Ecto has deprecated `Repo.transaction` in favor of `Repo.transact`. Since this decision doesn't align with FoundationDB's view of
 transactions, we have chosen to deprecate `Repo.transaction` in favor of `Repo.transactional`. This terminology better aligns with
-`:erlfdb` and provides a distinction from RDBMS transactions.
+`:erlfdb` and provides a distinction from RDBMS transactions, and allows us to avoid future deprecations.
 
 ### New documentation
 

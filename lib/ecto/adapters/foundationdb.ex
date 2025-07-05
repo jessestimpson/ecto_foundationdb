@@ -458,13 +458,14 @@ defmodule Ecto.Adapters.FoundationDB do
   ```
 
   The easiest way to insert such records is by using `Repo.async_insert_all/3`. This function follows a different
-  approach than the other `Repo.async_*` functions; the future must be awaited *outside* of the transaction.
+  approach than the other `Repo.async_*` functions: the future must be awaited *outside* of the transaction.
 
   ```elixir
-  future = MyApp.Repo.transactional(tenant, fn ->
-    MyApp.Repo.async_insert_all(MyApp.Event, [%MyApp.Event{data: "event_a"}, %MyApp.Event{data: "event_b"}])
+  alias MyApp.{Repo, Event}
+  future = Repo.transactional(tenant, fn ->
+    Repo.async_insert_all(Event, [%Event{data: "event_a"}, %Event{data: "event_b"}])
   end)
-  [event_a, event_b] = MyApp.Repo.await(future)
+  [event_a, event_b] = Repo.await(future)
   ```
 
   The purpose of the async/await pattern here is for the FDB client to discover the committed versionstamp, and to apply
@@ -490,8 +491,8 @@ defmodule Ecto.Adapters.FoundationDB do
   Note:
 
    - The approach to inserting above is guaranteed to have zero conflicts with other keys in the database.
-   - A group of records inserted in a single transaction will have versionatmps that are guaranteed to increment by 1.
-   - Records inserted in different transactions will not have a predictable versionstamp distance from each other. That distance
+   - A group of records inserted in a single transaction **will** have versionatmps that are guaranteed to increment by 1.
+   - Records inserted in different transactions **will not** have a predictable versionstamp distance from each other. That distance
      is very unlikely to ever be 1.
 
   ## Watches

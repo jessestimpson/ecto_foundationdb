@@ -318,7 +318,6 @@ defmodule EctoFoundationDB.Indexer.Default do
     vs? = PrimaryKVCodec.vs?(kv_codec)
     mapped? = Keyword.get(index_options, :mapped?, true)
 
-    # @todo: pack_vs
     index_key =
       if vs? do
         Pack.default_index_pack_vs(

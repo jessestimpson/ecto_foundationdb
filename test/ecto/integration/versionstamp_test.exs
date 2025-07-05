@@ -132,4 +132,21 @@ defmodule Ecto.Integration.VersionstampTest do
     # next top
     assert [%QueueItem{id: ^id_b}] = TestRepo.all(QueueItem, limit: 1, prefix: tenant)
   end
+
+  test "versionstamp schema with index", context do
+    tenant = context[:tenant]
+
+    future =
+      TestRepo.transactional(tenant, fn ->
+        TestRepo.async_insert_all!(QueueItem, [
+          %QueueItem{author: "Alice", data: "test_a"},
+          %QueueItem{author: "Bob", data: "test_b"}
+        ])
+      end)
+
+    [%QueueItem{id: id_a}, %QueueItem{id: id_b}] = TestRepo.await(future)
+
+    assert %QueueItem{id: ^id_a} = TestRepo.get_by!(QueueItem, [author: "Alice"], prefix: tenant)
+    assert %QueueItem{id: ^id_b} = TestRepo.get_by!(QueueItem, [author: "Bob"], prefix: tenant)
+  end
 end

@@ -8,6 +8,7 @@ defmodule EctoFoundationDB.Schemas.QueueItem do
   @primary_key {:id, Versionstamp, autogenerate: false}
 
   schema "queue" do
+    field(:author, :string)
     field(:data, :binary)
   end
 end

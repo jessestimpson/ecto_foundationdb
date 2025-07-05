@@ -5,11 +5,13 @@ defmodule Ecto.Integration.FdbApiCountingTest do
 
   alias EctoFoundationDB.Layer.MetadataVersion
   alias EctoFoundationDB.Tenant
+  alias EctoFoundationDB.Versionstamp
 
   alias Ecto.Adapters.FoundationDB
   alias Ecto.Integration.TestRepo
 
   alias EctoFoundationDB.ModuleToModuleTracer
+  alias EctoFoundationDB.Schemas.QueueItem
   alias EctoFoundationDB.Schemas.User
   alias EctoFoundationDB.Test.Util
 
@@ -25,6 +27,8 @@ defmodule Ecto.Integration.FdbApiCountingTest do
     {:erlfdb, :wait, 1},
     {:erlfdb, :wait_for_any, 1},
     {:erlfdb, :set, 3},
+    {:erlfdb, :set_versionstamped_key, 3},
+    {:erlfdb, :set_versionstamped_value, 3},
     {:erlfdb, :clear, 2},
     {:erlfdb, :clear_range, 3},
     {:erlfdb, :max, 3},
@@ -492,6 +496,38 @@ defmodule Ecto.Integration.FdbApiCountingTest do
 
              # clear :name index
              {EctoFoundationDB.Indexer.Default, :clear}
+           ] == calls
+  end
+
+  test "async_insert_all!", context do
+    tenant = context[:tenant]
+
+    # Prime metadata cache
+    TestRepo.transactional(tenant, fn tx ->
+      TestRepo.insert!(%QueueItem{id: Versionstamp.next(tx)})
+    end)
+
+    {calls, _eve} =
+      with_erlfdb_calls(context.test, fn ->
+        f =
+          TestRepo.transactional(tenant, fn ->
+            TestRepo.async_insert_all!(QueueItem, [%QueueItem{author: "test", data: "test"}])
+          end)
+
+        TestRepo.await(f)
+      end)
+
+    assert [
+             # we always get global metadataVersion
+             {EctoFoundationDB.Layer.MetadataVersion, :get},
+             {EctoFoundationDB.Future, :wait},
+
+             # set the primary write and the index
+             {EctoFoundationDB.Layer.PrimaryKVCodec, :set_versionstamped_key},
+             {EctoFoundationDB.Indexer.Default, :set_versionstamped_key},
+
+             # wait for versionstamp future
+             {EctoFoundationDB.Future, :wait_for_all_interleaving}
            ] == calls
   end
 end

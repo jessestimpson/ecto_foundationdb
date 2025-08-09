@@ -78,7 +78,8 @@ defmodule EctoFoundationdb.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test, :docs]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.16", only: :dev, runtime: false},
-      {:benchee, "~> 1.0", only: :bench}
+      {:benchee, "~> 1.0", only: :bench},
+      {:riak_dt, github: "OpenRiak/riak_dt"}
     ]
   end
 

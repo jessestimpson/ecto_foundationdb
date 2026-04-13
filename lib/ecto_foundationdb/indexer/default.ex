@@ -186,18 +186,18 @@ defmodule EctoFoundationDB.Indexer.Default do
   # same transaction. So, we must choose either the key or the value of the index entry.
   # A natural choice is to use the value to have the versionstamp so that
   # get_mapped_range works correctly. However, then we lose the ability to manage the index
-  # on updates and clears. Therefore, we must put the versionstamp in the index_key and
-  # which forces our mapper to inspect both the key and value to extract the pk.
+  # on updates and clears. Therefore, we must put the versionstamp in the index_key,
+  # which forces our mapper to extract the pk from the index key via {K[n]}.
   #
-  # This means that the value portion of the index kv will always be written with an
-  # incomplete versionstamp. Maybe someday FDB will support setting both the key and
-  # value, and this can be cleaned up
+  # The value of the index entry stores only the prefix/source/namespace elements needed
+  # by the mapper ({V[n]} references). Since the pk is always extracted from the index key,
+  # it does not need to be stored in the value.
   defp set_index_entry(tx, {index_key, kv_codec = %PrimaryKVCodec{}, false, true}) do
-    :erlfdb.set(tx, index_key, kv_codec.packed)
+    :erlfdb.set(tx, index_key, PrimaryKVCodec.pack_prefix(kv_codec))
   end
 
   defp set_index_entry(tx, {index_key, kv_codec = %PrimaryKVCodec{}, true, true}) do
-    :erlfdb.set_versionstamped_key(tx, index_key, kv_codec.packed)
+    :erlfdb.set_versionstamped_key(tx, index_key, PrimaryKVCodec.pack_prefix(kv_codec))
   end
 
   defp set_index_entry(tx, {index_key, index_object, true, false}) when is_binary(index_object) do

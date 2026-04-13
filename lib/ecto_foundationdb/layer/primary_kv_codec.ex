@@ -99,6 +99,11 @@ defmodule EctoFoundationDB.Layer.PrimaryKVCodec do
     %{kv_codec | packed: pack_key(kv_codec, nil)}
   end
 
+  def pack_prefix(%__MODULE__{tuple: tuple}) when is_tuple(tuple) do
+    prefix_tuple = Tuple.delete_at(tuple, tuple_size(tuple) - 1)
+    :erlfdb_tuple.pack(prefix_tuple)
+  end
+
   def with_unpacked_tuple(kv_codec = %{tuple: tuple}, _tenant) when not is_nil(tuple),
     do: kv_codec
 

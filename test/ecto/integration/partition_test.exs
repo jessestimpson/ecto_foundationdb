@@ -118,7 +118,7 @@ defmodule Ecto.Integration.PartitionTest do
       assert [%Session{data: "target"}] = results
     end
 
-    test "Repo.delete removes record and partition lookup", context do
+    test "delete_all with compound pk removes record", context do
       tenant = context[:tenant]
 
       future =
@@ -131,7 +131,10 @@ defmodule Ecto.Integration.PartitionTest do
 
       [to_delete, _to_keep] = TestRepo.await(future)
 
-      TestRepo.delete!(to_delete |> FoundationDB.usetenant(tenant))
+      TestRepo.delete_all(
+        from(s in Session, where: s.id == ^{to_delete.user_id, to_delete.id}),
+        prefix: tenant
+      )
 
       remaining =
         TestRepo.all(
@@ -142,7 +145,24 @@ defmodule Ecto.Integration.PartitionTest do
       assert Enum.all?(remaining, fn s -> s.data != "to-delete" end)
     end
 
-    test "Repo.update changes non-partition fields", context do
+    test "Repo.delete raises Unsupported for partitioned schemas", context do
+      tenant = context[:tenant]
+
+      future =
+        TestRepo.transactional(tenant, fn ->
+          TestRepo.async_insert_all!(Session, [
+            %Session{id: Versionstamp.next(), user_id: "alice", data: "data"}
+          ])
+        end)
+
+      [session] = TestRepo.await(future)
+
+      assert_raise Unsupported, ~r/Repo.delete is not supported/, fn ->
+        TestRepo.delete!(session |> FoundationDB.usetenant(tenant))
+      end
+    end
+
+    test "update_all with compound pk changes non-partition fields", context do
       tenant = context[:tenant]
 
       future =
@@ -154,14 +174,12 @@ defmodule Ecto.Integration.PartitionTest do
 
       [session] = TestRepo.await(future)
 
-      # Update a non-partition field
-      {:ok, updated} =
-        session
-        |> FoundationDB.usetenant(tenant)
-        |> Ecto.Changeset.change(data: "updated")
-        |> TestRepo.update()
-
-      assert updated.data == "updated"
+      # Update a non-partition field using a compound pk constraint
+      TestRepo.update_all(
+        from(s in Session, where: s.id == ^{session.user_id, session.id}),
+        [set: [data: "updated"]],
+        prefix: tenant
+      )
 
       # Verify we can still query it
       results =
@@ -173,7 +191,27 @@ defmodule Ecto.Integration.PartitionTest do
       assert [%Session{data: "updated"}] = results
     end
 
-    test "Repo.update raises when changing the partition field", context do
+    test "Repo.update raises Unsupported for partitioned schemas", context do
+      tenant = context[:tenant]
+
+      future =
+        TestRepo.transactional(tenant, fn ->
+          TestRepo.async_insert_all!(Session, [
+            %Session{id: Versionstamp.next(), user_id: "alice", data: "data"}
+          ])
+        end)
+
+      [session] = TestRepo.await(future)
+
+      assert_raise Unsupported, ~r/Repo.update is not supported/, fn ->
+        session
+        |> FoundationDB.usetenant(tenant)
+        |> Ecto.Changeset.change(data: "updated")
+        |> TestRepo.update()
+      end
+    end
+
+    test "update_all raises when changing the partition field", context do
       tenant = context[:tenant]
 
       future =
@@ -186,10 +224,11 @@ defmodule Ecto.Integration.PartitionTest do
       [session] = TestRepo.await(future)
 
       assert_raise Unsupported, ~r/Cannot change the partition field/, fn ->
-        session
-        |> FoundationDB.usetenant(tenant)
-        |> Ecto.Changeset.change(user_id: "bob")
-        |> TestRepo.update()
+        TestRepo.update_all(
+          from(s in Session, where: s.id == ^{session.user_id, session.id}),
+          [set: [user_id: "bob"]],
+          prefix: tenant
+        )
       end
     end
 

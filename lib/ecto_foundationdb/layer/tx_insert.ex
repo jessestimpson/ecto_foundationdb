@@ -76,32 +76,12 @@ defmodule EctoFoundationDB.Layer.TxInsert do
 
     if write_primary do
       PrimaryKVCodec.set_new_kvs(tx, kv_codec, kvs)
-      write_partition_lookup(tx, tenant, source, schema, kv_codec, data_object)
     end
 
     kv_codec = PrimaryKVCodec.with_packed_key(kv_codec)
 
     Indexer.set(tenant, tx, metadata, schema, {kv_codec, data_object})
     :ok
-  end
-
-  defp write_partition_lookup(tx, tenant, source, schema, kv_codec, data_object) do
-    context = Schema.get_context!(source, schema)
-    partition_field = Schema.get_partition_field(context)
-
-    if partition_field do
-      [{_pk_field, pk} | _] = data_object
-      partition_value = data_object[partition_field]
-      encoded = :erlang.term_to_binary(partition_value)
-
-      if kv_codec.vs? do
-        lookup_key = Pack.partition_lookup_pack_vs(tenant, source, pk)
-        :erlfdb.set_versionstamped_key(tx, lookup_key, encoded)
-      else
-        lookup_key = Pack.partition_lookup_pack(tenant, source, pk)
-        :erlfdb.set(tx, lookup_key, encoded)
-      end
-    end
   end
 
   def do_set(acc, tx, new_kv, existing_kv) do

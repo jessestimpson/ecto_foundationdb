@@ -20,7 +20,6 @@ defmodule EctoFoundationDB.Layer.Pack do
   @data_namespace "d"
   @index_namespace "i"
   @metadata_namespace "m"
-  @partition_namespace "p"
 
   @doc """
   ## Examples
@@ -141,29 +140,6 @@ defmodule EctoFoundationDB.Layer.Pack do
   """
   def primary_range(tenant, source, partition_value) do
     namespaced_range(tenant, source, @data_namespace, [encode_pk_for_key(partition_value)])
-  end
-
-  @doc """
-  Returns a packed key for the partition lookup namespace. The key maps a versionstamp
-  primary key to its partition value, enabling efficient point lookups during update/delete.
-  """
-  def partition_lookup_pack(tenant, source, id) do
-    namespaced_pack(tenant, source, @partition_namespace, [encode_pk_for_key(id)])
-  end
-
-  @doc """
-  Returns a packed versionstamped key for the partition lookup namespace.
-  Use with `:erlfdb.set_versionstamped_key/3` when the primary key contains an incomplete versionstamp.
-  """
-  def partition_lookup_pack_vs(tenant, source, id) do
-    namespaced_pack_vs(tenant, source, @partition_namespace, [encode_pk_for_key(id)])
-  end
-
-  @doc """
-  Returns the key range for looking up a single partition value by its versionstamp primary key.
-  """
-  def partition_lookup_range(tenant, source, id) do
-    namespaced_range(tenant, source, @partition_namespace, [encode_pk_for_key(id)])
   end
 
   @doc """

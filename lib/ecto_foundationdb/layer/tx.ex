@@ -12,6 +12,8 @@ defmodule EctoFoundationDB.Layer.Tx do
   alias EctoFoundationDB.Schema
   alias EctoFoundationDB.Tenant
 
+  @partition_not_found :partition_not_found
+
   @tenant :__ectofdbtxcontext__
   @tx :__ectofdbtx__
 
@@ -148,30 +150,36 @@ defmodule EctoFoundationDB.Layer.Tx do
         options
       ) do
     write_primary = Schema.get_option(context, :write_primary)
+    partition_field = Schema.get_partition_field(context)
 
     futures =
       Enum.map(pks, fn pk ->
-        kv_codec = Pack.primary_codec(tenant, source, pk)
-        future = async_get(tenant, tx, kv_codec)
+        case get_kv_codec_for_pk(tenant, tx, source, pk, partition_field) do
+          @partition_not_found ->
+            Future.new(:result, nil)
 
-        Future.then(future, fn
-          nil ->
-            nil
+          kv_codec ->
+            future = async_get(tenant, tx, kv_codec)
 
-          decoded_kv ->
-            update_data_object(
-              tenant,
-              tx,
-              schema,
-              pk_field,
-              {decoded_kv, [set: set_data]},
-              metadata,
-              write_primary,
-              options
-            )
+            Future.then(future, fn
+              nil ->
+                nil
 
-            :ok
-        end)
+              decoded_kv ->
+                update_data_object(
+                  tenant,
+                  tx,
+                  schema,
+                  pk_field,
+                  {decoded_kv, [set: set_data]},
+                  metadata,
+                  write_primary,
+                  options
+                )
+
+                :ok
+            end)
+        end
       end)
 
     futures
@@ -181,6 +189,26 @@ defmodule EctoFoundationDB.Layer.Tx do
       nil, sum -> sum
       :ok, sum -> sum + 1
     end)
+  end
+
+  defp get_kv_codec_for_pk(tenant, _tx, source, pk, nil) do
+    Pack.primary_codec(tenant, source, pk)
+  end
+
+  defp get_kv_codec_for_pk(tenant, tx, source, pk, _partition_field) do
+    case lookup_partition(tenant, tx, source, pk) do
+      {:ok, partition_value} -> Pack.primary_codec(tenant, source, partition_value, pk)
+      :error -> @partition_not_found
+    end
+  end
+
+  defp lookup_partition(tenant, tx, source, pk) do
+    {start_key, end_key} = Pack.partition_lookup_range(tenant, source, pk)
+
+    case :erlfdb.get_range(tx, start_key, end_key) do
+      [{_k, v}] -> {:ok, :erlang.binary_to_term(v)}
+      [] -> :error
+    end
   end
 
   def update_data_object(
@@ -195,6 +223,8 @@ defmodule EctoFoundationDB.Layer.Tx do
       ) do
     %DecodedKV{codec: kv_codec, data_object: orig_data_object} = decoded_kv
     orig_data_object = Fields.to_front(orig_data_object, pk_field)
+
+    assert_partition_field_unchanged!(schema, orig_data_object, updates)
 
     data_object =
       orig_data_object
@@ -219,27 +249,36 @@ defmodule EctoFoundationDB.Layer.Tx do
     Indexer.update(tenant, tx, metadata, schema, {kv_codec, orig_data_object}, updates)
   end
 
-  def delete_pks(tenant, tx, {schema, source, _context}, pks, metadata) do
+  def delete_pks(tenant, tx, {schema, source, context}, pks, metadata) do
+    partition_field = Schema.get_partition_field(context)
+
     futures =
       Enum.map(pks, fn pk ->
-        kv_codec = Pack.primary_codec(tenant, source, pk)
-        future = async_get(tenant, tx, kv_codec)
+        kv_codec = get_kv_codec_for_pk(tenant, tx, source, pk, partition_field)
 
-        Future.then(future, fn
-          nil ->
-            nil
+        case kv_codec do
+          @partition_not_found ->
+            Future.new(:result, nil)
 
-          decoded_kv ->
-            delete_data_object(
-              tenant,
-              tx,
-              schema,
-              decoded_kv,
-              metadata
-            )
+          kv_codec ->
+            future = async_get(tenant, tx, kv_codec)
 
-            :ok
-        end)
+            Future.then(future, fn
+              nil ->
+                nil
+
+              decoded_kv ->
+                delete_data_object(
+                  tenant,
+                  tx,
+                  schema,
+                  decoded_kv,
+                  metadata
+                )
+
+                :ok
+            end)
+        end
       end)
 
     futures
@@ -270,6 +309,48 @@ defmodule EctoFoundationDB.Layer.Tx do
     end
 
     Indexer.clear(tenant, tx, metadata, schema, {kv_codec, v})
+    clear_partition_lookup(tenant, tx, schema, v)
+  end
+
+  defp clear_partition_lookup(_tenant, _tx, nil, _v), do: :ok
+
+  defp clear_partition_lookup(tenant, tx, schema, v) do
+    context = Schema.get_context!(nil, schema)
+    partition_field = Schema.get_partition_field(context)
+
+    if partition_field do
+      source = schema.__schema__(:source)
+      [{_pk_field, pk} | _] = v
+      lookup_key = Pack.partition_lookup_pack(tenant, source, pk)
+      :erlfdb.clear(tx, lookup_key)
+    end
+  end
+
+  defp assert_partition_field_unchanged!(nil, _orig, _updates), do: :ok
+
+  defp assert_partition_field_unchanged!(schema, orig_data_object, updates) do
+    context = Schema.get_context!(nil, schema)
+    partition_field = Schema.get_partition_field(context)
+
+    if partition_field do
+      orig_value = orig_data_object[partition_field]
+      updates_set = updates[:set] || []
+
+      case Keyword.fetch(updates_set, partition_field) do
+        {:ok, new_value} when new_value != orig_value ->
+          raise Unsupported, """
+          Cannot change the partition field #{inspect(partition_field)} on a schema with partition support.
+
+          The field #{inspect(partition_field)} determines the keyspace partition for this record.
+          Changing it would require moving the record to a different partition, which is not supported.
+
+          To move a record to a different partition, delete it and re-insert it with the new partition value.
+          """
+
+        _ ->
+          :ok
+      end
+    end
   end
 
   def clear_all(tenant, tx, %{opts: _adapter_opts}, source) do

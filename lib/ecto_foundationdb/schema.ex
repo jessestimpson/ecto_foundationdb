@@ -25,4 +25,6 @@ defmodule EctoFoundationDB.Schema do
 
   def get_option(nil, _key, default), do: default
   def get_option(context, key, default), do: Keyword.get(context, key, default)
+
+  def get_partition_field(context), do: get_option(context, :partition, nil)
 end

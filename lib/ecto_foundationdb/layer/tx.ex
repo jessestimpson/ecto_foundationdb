@@ -148,7 +148,7 @@ defmodule EctoFoundationDB.Layer.Tx do
         options
       ) do
     write_primary = Schema.get_option(context, :write_primary)
-    partition_field = Schema.get_partition_field(context)
+    partition_field = Schema.get_partition_field(schema, context)
 
     if partition_field do
       raise Unsupported, """
@@ -237,7 +237,7 @@ defmodule EctoFoundationDB.Layer.Tx do
   end
 
   def delete_pks(tenant, tx, {schema, source, context}, pks, metadata) do
-    partition_field = Schema.get_partition_field(context)
+    partition_field = Schema.get_partition_field(schema, context)
 
     if partition_field do
       raise Unsupported, """
@@ -308,7 +308,7 @@ defmodule EctoFoundationDB.Layer.Tx do
 
   defp assert_partition_field_unchanged!(schema, orig_data_object, updates) do
     context = Schema.get_context!(nil, schema)
-    partition_field = Schema.get_partition_field(context)
+    partition_field = Schema.get_partition_field(schema, context)
 
     if partition_field do
       orig_value = orig_data_object[partition_field]

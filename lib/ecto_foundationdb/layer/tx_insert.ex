@@ -35,7 +35,7 @@ defmodule EctoFoundationDB.Layer.TxInsert do
     } = acc
 
     context = Schema.get_context!(source, schema)
-    partition_field = Schema.get_partition_field(context)
+    partition_field = Schema.get_partition_field(schema, context)
 
     kv_codec =
       if partition_field do

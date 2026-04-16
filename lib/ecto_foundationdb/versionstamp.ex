@@ -4,8 +4,19 @@ defmodule EctoFoundationDB.Versionstamp do
   that is guaranteed to be unique across all records in the database.
 
   Please refer to the documentation for `Repo.async_insert_all!/3`.
+
+  ## Partition option
+
+  When used as a primary key type, an optional `partition:` option can be provided to
+  co-locate records with the same partition field value in the same keyspace:
+
+      @primary_key {:id, {EctoFoundationDB.Versionstamp, partition: :user_id}, autogenerate: false}
+
+  This enables efficient single-partition range scans:
+
+      Repo.all(from s in Session, where: s.id >= ^{"alice", checkpoint}, prefix: tenant)
   """
-  use Ecto.Type
+  use Ecto.ParameterizedType
 
   alias EctoFoundationDB.Exception.Unsupported
   alias EctoFoundationDB.Future
@@ -23,6 +34,13 @@ defmodule EctoFoundationDB.Versionstamp do
 
   def incomplete?({:versionstamp, @inc_id, @inc_batch, _}), do: true
   def incomplete?(_), do: false
+
+  @doc """
+  Returns true if the given value is a parameterized Versionstamp type term,
+  as returned by `schema.__schema__(:type, field)`.
+  """
+  def type?({:parameterized, __MODULE__, _}), do: true
+  def type?(_), do: false
 
   def get(tx) do
     Future.new(:erlfdb_future, :erlfdb.get_versionstamp(tx), &from_binary/1)
@@ -84,17 +102,24 @@ defmodule EctoFoundationDB.Versionstamp do
   end
 
   @impl true
-  def type(), do: :id
+  def init(opts) do
+    %{partition: Keyword.get(opts, :partition)}
+  end
 
   @impl true
-  def cast(id) when is_integer(id), do: {:ok, from_integer(id)}
-  def cast(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
-  def cast(id_str) when is_binary(id_str), do: Ecto.Type.cast(:id, id_str)
-  def cast(_), do: :error
+  def type(_params), do: :id
 
   @impl true
-  def dump(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
+  def cast(id, _params) when is_integer(id), do: {:ok, from_integer(id)}
+  def cast(vs = {:versionstamp, _, _, _}, _params), do: {:ok, vs}
+  def cast(id_str, _params) when is_binary(id_str), do: Ecto.Type.cast(:id, id_str)
+  def cast(_, _params), do: :error
 
   @impl true
-  def load(vs = {:versionstamp, _, _, _}), do: {:ok, vs}
+  def dump(vs = {:versionstamp, _, _, _}, _dumper, _params), do: {:ok, vs}
+  def dump(_, _, _), do: :error
+
+  @impl true
+  def load(vs = {:versionstamp, _, _, _}, _loader, _params), do: {:ok, vs}
+  def load(_, _, _), do: :error
 end

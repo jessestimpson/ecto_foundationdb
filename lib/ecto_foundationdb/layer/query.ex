@@ -339,8 +339,8 @@ defmodule EctoFoundationDB.Layer.Query do
   # Returns the partition field name from the plan's schema context, or nil if not partitioned.
   defp get_plan_partition_field(%QueryPlan{schema: nil}), do: nil
 
-  defp get_plan_partition_field(%QueryPlan{schema: _schema, context: context}) do
-    Schema.get_partition_field(context)
+  defp get_plan_partition_field(%QueryPlan{schema: schema, context: context}) do
+    Schema.get_partition_field(schema, context)
   end
 
   # Splits a query param into {partition_value_or_nil, id_or_nil}.

@@ -1,11 +1,11 @@
 defmodule EctoFoundationDB.Schemas.Session do
   @moduledoc false
 
-  use EctoFoundationDB.Schema
+  use Ecto.Schema
 
   alias EctoFoundationDB.Versionstamp
 
-  @primary_key {:id, Versionstamp, autogenerate: false, partition: :user_id}
+  @primary_key {:id, {Versionstamp, partition: :user_id}, autogenerate: false}
 
   schema "sessions" do
     field(:user_id, :string)

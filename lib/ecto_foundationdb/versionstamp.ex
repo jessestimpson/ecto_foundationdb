@@ -5,12 +5,12 @@ defmodule EctoFoundationDB.Versionstamp do
 
   Please refer to the documentation for `Repo.async_insert_all!/3`.
 
-  ## Partition option
+  ## Partition-by option
 
-  When used as a primary key type, an optional `partition:` option can be provided to
-  co-locate records with the same partition field value in the same keyspace:
+  When used as a primary key type, an optional `partition_by:` option can be provided to
+  co-locate records with the same field value in the same keyspace:
 
-      @primary_key {:id, {EctoFoundationDB.Versionstamp, partition: :user_id}, autogenerate: false}
+      @primary_key {:id, {EctoFoundationDB.Versionstamp, partition_by: :user_id}, autogenerate: false}
 
   This enables efficient single-partition range scans:
 
@@ -103,7 +103,7 @@ defmodule EctoFoundationDB.Versionstamp do
 
   @impl true
   def init(opts) do
-    %{partition: Keyword.get(opts, :partition)}
+    %{partition_by: Keyword.get(opts, :partition_by)}
   end
 
   @impl true

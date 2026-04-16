@@ -148,7 +148,7 @@ defmodule EctoFoundationDB.Layer.Tx do
         options
       ) do
     write_primary = Schema.get_option(context, :write_primary)
-    partition_field = Schema.get_partition_field(schema, context)
+    partition_field = Schema.get_partition_by_field(schema, context)
 
     if partition_field do
       raise Unsupported, """
@@ -211,7 +211,7 @@ defmodule EctoFoundationDB.Layer.Tx do
     %DecodedKV{codec: kv_codec, data_object: orig_data_object} = decoded_kv
     orig_data_object = Fields.to_front(orig_data_object, pk_field)
 
-    assert_partition_field_unchanged!(schema, orig_data_object, updates)
+    assert_partition_by_unchanged!(schema, orig_data_object, updates)
 
     data_object =
       orig_data_object
@@ -237,7 +237,7 @@ defmodule EctoFoundationDB.Layer.Tx do
   end
 
   def delete_pks(tenant, tx, {schema, source, context}, pks, metadata) do
-    partition_field = Schema.get_partition_field(schema, context)
+    partition_field = Schema.get_partition_by_field(schema, context)
 
     if partition_field do
       raise Unsupported, """
@@ -304,11 +304,11 @@ defmodule EctoFoundationDB.Layer.Tx do
     Indexer.clear(tenant, tx, metadata, schema, {kv_codec, v})
   end
 
-  defp assert_partition_field_unchanged!(nil, _orig, _updates), do: :ok
+  defp assert_partition_by_unchanged!(nil, _orig, _updates), do: :ok
 
-  defp assert_partition_field_unchanged!(schema, orig_data_object, updates) do
+  defp assert_partition_by_unchanged!(schema, orig_data_object, updates) do
     context = Schema.get_context!(nil, schema)
-    partition_field = Schema.get_partition_field(schema, context)
+    partition_field = Schema.get_partition_by_field(schema, context)
 
     if partition_field do
       orig_value = orig_data_object[partition_field]
@@ -317,7 +317,7 @@ defmodule EctoFoundationDB.Layer.Tx do
       case Keyword.fetch(updates_set, partition_field) do
         {:ok, new_value} when new_value != orig_value ->
           raise Unsupported, """
-          Cannot change the partition field #{inspect(partition_field)} on a schema with partition support.
+          Cannot change the partition_by field #{inspect(partition_field)} on a schema with partition support.
 
           The field #{inspect(partition_field)} determines the keyspace partition for this record.
           Changing it would require moving the record to a different partition, which is not supported.

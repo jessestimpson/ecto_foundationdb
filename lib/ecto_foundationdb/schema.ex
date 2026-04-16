@@ -29,18 +29,18 @@ defmodule EctoFoundationDB.Schema do
   def get_option(context, key, default), do: Keyword.get(context, key, default)
 
   @doc false
-  def get_partition_field(schema, context) when is_atom(schema) and not is_nil(schema) do
+  def get_partition_by_field(schema, context) when is_atom(schema) and not is_nil(schema) do
     case schema.__schema__(:primary_key) do
       [pk_field | _] ->
         case schema.__schema__(:type, pk_field) do
-          {:parameterized, Versionstamp, %{partition: p}} when not is_nil(p) -> p
-          _ -> get_option(context, :partition, nil)
+          {:parameterized, Versionstamp, %{partition_by: p}} when not is_nil(p) -> p
+          _ -> get_option(context, :partition_by, nil)
         end
 
       _ ->
-        get_option(context, :partition, nil)
+        get_option(context, :partition_by, nil)
     end
   end
 
-  def get_partition_field(_schema, context), do: get_option(context, :partition, nil)
+  def get_partition_by_field(_schema, context), do: get_option(context, :partition_by, nil)
 end

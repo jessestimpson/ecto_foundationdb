@@ -279,7 +279,7 @@ defmodule EctoFoundationDB.Layer.Query do
          },
          _options
        ) do
-    partition_field = get_plan_partition_field(plan)
+    partition_field = get_plan_partition_by_field(plan)
     {partition_value, id} = split_partition_param(param, partition_field)
     kv_codec = build_primary_codec(tenant, plan.source, partition_value, id)
     layer_data = %{layer_data | range: PrimaryKVCodec.range(kv_codec)}
@@ -299,7 +299,7 @@ defmodule EctoFoundationDB.Layer.Query do
       inclusive_right?: inclusive_right?
     } = between
 
-    partition_field = get_plan_partition_field(plan)
+    partition_field = get_plan_partition_by_field(plan)
     {left_partition, actual_left} = split_partition_param(param_left, partition_field)
     {right_partition, actual_right} = split_partition_param(param_right, partition_field)
 
@@ -337,10 +337,10 @@ defmodule EctoFoundationDB.Layer.Query do
   end
 
   # Returns the partition field name from the plan's schema context, or nil if not partitioned.
-  defp get_plan_partition_field(%QueryPlan{schema: nil}), do: nil
+  defp get_plan_partition_by_field(%QueryPlan{schema: nil}), do: nil
 
-  defp get_plan_partition_field(%QueryPlan{schema: schema, context: context}) do
-    Schema.get_partition_field(schema, context)
+  defp get_plan_partition_by_field(%QueryPlan{schema: schema, context: context}) do
+    Schema.get_partition_by_field(schema, context)
   end
 
   # Splits a query param into {partition_value_or_nil, id_or_nil}.

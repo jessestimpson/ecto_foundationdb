@@ -223,7 +223,7 @@ defmodule Ecto.Integration.PartitionTest do
 
       [session] = TestRepo.await(future)
 
-      assert_raise Unsupported, ~r/Cannot change the partition field/, fn ->
+      assert_raise Unsupported, ~r/Cannot change the partition_by field/, fn ->
         TestRepo.update_all(
           from(s in Session, where: s.id == ^{session.user_id, session.id}),
           [set: [user_id: "bob"]],

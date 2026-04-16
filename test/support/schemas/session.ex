@@ -5,7 +5,7 @@ defmodule EctoFoundationDB.Schemas.Session do
 
   alias EctoFoundationDB.Versionstamp
 
-  @primary_key {:id, {Versionstamp, partition: :user_id}, autogenerate: false}
+  @primary_key {:id, {Versionstamp, partition_by: :user_id}, autogenerate: false}
 
   schema "sessions" do
     field(:user_id, :string)

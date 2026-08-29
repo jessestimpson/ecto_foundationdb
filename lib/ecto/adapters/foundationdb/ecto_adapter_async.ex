@@ -9,10 +9,19 @@ defmodule Ecto.Adapters.FoundationDB.EctoAdapterAsync do
   import Ecto.Query
 
   def async_insert_all!(_module, repo, schema, list, opts) do
-    {tx?, tenant} = Tx.in_tenant_tx?()
+    tenant =
+      case Tx.fetch_tenant(opts[:prefix]) do
+        {:ok, tenant} ->
+          tenant
 
-    if not tx?,
-      do: raise(Unsupported, "`Repo.async_insert_all!` must be called within a transaction")
+        :error ->
+          raise Unsupported, """
+          `Repo.async_insert_all!` must be called within a transaction on a tenant.
+
+          Use `Repo.transactional(tenant, fn -> ... end)`, or provide the option \
+          `prefix: tenant` when inside a transaction on a database.
+          """
+      end
 
     if Fields.composite_pk?(schema) do
       raise Unsupported, """

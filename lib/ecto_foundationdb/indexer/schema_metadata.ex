@@ -184,7 +184,7 @@ defmodule EctoFoundationDB.Indexer.SchemaMetadata do
   end
 
   def watch_by(queryable, indexed_values, name, opts \\ []) do
-    {tenant, tx} = assert_tenant_tx!()
+    {tenant, tx} = assert_tenant_tx!(opts[:prefix])
 
     {schema, query_opts} =
       case queryable do
@@ -413,28 +413,19 @@ defmodule EctoFoundationDB.Indexer.SchemaMetadata do
   defp decode_counter(:not_found), do: 0
   defp decode_counter(x), do: :binary.decode_unsigned(x, :little)
 
-  defp assert_tenant_tx!() do
-    tenant =
-      case Tx.in_tenant_tx?() do
-        {true, tenant} ->
-          tenant
+  defp assert_tenant_tx!(prefix \\ nil) do
+    case Tx.fetch_tenant(prefix) do
+      {:ok, tenant} ->
+        {tenant, Tx.get()}
 
-        {false, _} ->
-          raise Unsupported, """
-          SchemaMetadata functions must be executed for a specific tenant.
-          """
-      end
-
-    tx =
-      if Tx.in_tx?() do
-        Tx.get()
-      else
+      :error ->
         raise Unsupported, """
-        SchemaMetadata functions must be executed within a transaction.
-        """
-      end
+        SchemaMetadata functions must be executed within a transaction on a specific tenant.
 
-    {tenant, tx}
+        Use `Repo.transactional(tenant, fn -> ... end)`, or provide the option \
+        `prefix: tenant` when inside a transaction on a database.
+        """
+    end
   end
 
   defp with_schema_metadata_indexes(md = %Metadata{indexes: indexes}) do

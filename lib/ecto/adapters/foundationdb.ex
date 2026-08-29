@@ -427,6 +427,8 @@ defmodule Ecto.Adapters.FoundationDB do
   Note: If you're looking for PubSub-like functionality pushed from the database itself, please see
   [Watches](#module-watches).
 
+  ### Single-Tenant Repo
+
   For a single-tenant Repo (one configured with `:tenant_id`), you can use `Repo.transactional/1`,
   which automatically uses the configured tenant:
 
@@ -439,6 +441,23 @@ defmodule Ecto.Adapters.FoundationDB do
 
   `Repo.transactional/1` raises `EctoFoundationDB.Exception.IncorrectTenancy` if called on
   a multi-tenant Repo.
+
+  ### Transactions across Repos and Tenants
+
+  EctoFoundationDB supports transactions involving many Repos and Tenants. When doing so, your top-level
+  `transactional` call accepts the FDB database object.
+
+  ```elixir
+  db = FoundationDB.db(MyApp.OrgRepo)
+
+  FoundationDB.transactional(db, fn ->
+    MyApp.OrgRepo.insert!(%Org{...}, prefix: org_tenant)
+    MyApp.MemberRepo.insert!(%Member{...}, prefix: member_tenant)
+  end)
+  ```
+
+  Nested calls to `transactional` operate within a *single transaction*. See `transactional/2` for the
+  nesting rules.
 
   ## Migrations
 
@@ -993,6 +1012,9 @@ defmodule Ecto.Adapters.FoundationDB do
     * `:migrator` - A module that implements the `EctoFoundationDB.Migrator`
       behaviour. Required when using any indexes. Defaults to `nil`. When `nil`,
       your Repo module is assumed to be the Migrator.
+    * `:migrate` - When set to `false`, opening a tenant skips the migration step.
+      Defaults to `true`. Intended to be given to `EctoFoundationDB.Tenant.open/3`
+      on read-only code paths. See `EctoFoundationDB.Tenant.open/3` for the caveats.
 
   ## Advanced options
 
@@ -1153,9 +1175,8 @@ defmodule Ecto.Adapters.FoundationDB do
   @doc """
   Executes the given function in a transaction on the database.
 
-  If you provide an arity-0 function, your function will be executed in
-  a newly spawned process. This is to ensure that EctoFoundationDB can
-  safely manage the process dictionary.
+  If you provide an arity-1 function, it receives the FoundationDB transaction, which you
+  can use with the `:erlfdb` API directly.
 
   Please be aware of the
   [limitations that FoundationDB](https://apple.github.io/foundationdb/developer-guide.html#transaction-basics)
@@ -1163,9 +1184,19 @@ defmodule Ecto.Adapters.FoundationDB do
 
   For example, a transaction must complete
   [within 5 seconds](https://apple.github.io/foundationdb/developer-guide.html#long-running-transactions).
+
+  ## Nested calls to `transactional`
+
+  Nested calls to `transactional` operate within a *single transaction*.
+
+  |inside|`transactional(tenant, …)`|`transactional(db, …)`|
+  |---|---|---|
+  |nothing|opens on the tenant|opens on the database|
+  |a tenant transaction|same tenant joins; another raises|joins, giving a tenant-free scope|
+  |a database transaction|any tenant of that database joins|joins|
   """
-  @spec transactional(Tenant.t(), function()) :: any()
-  def transactional(tenant, fun), do: Tx.transactional_external(tenant, fun)
+  @spec transactional(Tenant.t() | Database.t(), function()) :: any()
+  def transactional(tenant_or_db, fun), do: Tx.transactional(tenant_or_db, fun)
 
   @impl Ecto.Adapter
   defmacro __before_compile__(_env) do

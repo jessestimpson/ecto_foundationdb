@@ -84,6 +84,11 @@ defmodule EctoFoundationDB.Tenant do
   When opening tenants with a repo, all migrations are automatically performed. This
   can cause open/2 to take a significant amount of time. Tenants can be kept open
   indefinitely, with any number of database transactions issued upon them.
+
+  Provide the option `migrate: false` to skip the migration step. This is useful on
+  read-only code paths, where the cost of the migration check isn't warranted. Take
+  care: a tenant opened this way may be missing indexes that your queries expect, so
+  only do so when you know the tenant has already been migrated.
   """
   @spec open(Ecto.Repo.t(), id(), Options.t()) :: t()
   def open(repo, id, options \\ []) when byte_size(id) > 0 do
@@ -102,6 +107,8 @@ defmodule EctoFoundationDB.Tenant do
   When opening tenants with a repo, all migrations are automatically performed. This
   can cause open/2 to take a significant amount of time. Tenants can be kept open
   indefinitely, with any number of database transactions issued upon them.
+
+  Provide the option `migrate: false` to skip the migration step. See `open/3`.
   """
   @spec open!(Ecto.Repo.t(), id(), Options.t()) :: t()
   def open!(repo, id, options \\ []) when byte_size(id) > 0 do
@@ -208,6 +215,10 @@ defmodule EctoFoundationDB.Tenant do
   end
 
   defp handle_open(repo, tenant, options) do
-    Migrator.up(repo, tenant, options)
+    if Options.get(options, :migrate) do
+      Migrator.up(repo, tenant, options)
+    else
+      :ok
+    end
   end
 end

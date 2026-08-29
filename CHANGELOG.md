@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.7.7 (TBD)
+## v0.7.7 (2026-08-29)
 
 ### Enhancements
 
@@ -10,6 +10,11 @@
   more than one field is present, basic crud operations work as expected. Indexes, watches,
   order_by, and a Versionstamp key field all throw an Unsupported exception for now. Thanks to
   @fire for the contribution.
+* `Ecto.Adapters.FoundationDB.transactional/2` now accepts a database, from db/1, in place of a
+  tenant. Repo operations inside name their tenant with `:prefix`, so one FDB transaction can
+  span the tenants of several Repos sharing a database. `DirectoryTenant` only.
+* Added the `:migrate` option to `EctoFoundationDB.Tenant.open/3` and `open!/3`. When `false`,
+  opening the tenant skips the migration step, which is useful on read-only code paths.
 
 ### Bug fixes
 

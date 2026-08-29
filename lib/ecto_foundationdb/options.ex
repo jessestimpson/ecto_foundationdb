@@ -7,6 +7,7 @@ defmodule EctoFoundationDB.Options do
           | {:storage_delimiter, String.t()}
           | {:open_tenant_callback, function()}
           | {:migrator, module()}
+          | {:migrate, boolean()}
           | {:cluster_file, :erlfdb.cluster_filename()}
           | {:migration_step, integer()}
           | {:max_single_value_size, integer()}
@@ -42,6 +43,9 @@ defmodule EctoFoundationDB.Options do
 
   def get(options, :migrator),
     do: Keyword.get(options, :migrator, nil)
+
+  def get(options, :migrate),
+    do: Keyword.get(options, :migrate, true)
 
   def get(options, :migration_step),
     do: Keyword.get(options, :migration_step, @migration_step)

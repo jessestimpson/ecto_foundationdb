@@ -8,29 +8,20 @@ defmodule EctoFoundationDB.Layer.Tx do
   alias EctoFoundationDB.Layer.Fields
   alias EctoFoundationDB.Layer.Pack
   alias EctoFoundationDB.Layer.PrimaryKVCodec
+  alias EctoFoundationDB.Layer.Tx.Context
   alias EctoFoundationDB.Layer.TxInsert
   alias EctoFoundationDB.Schema
   alias EctoFoundationDB.Tenant
 
-  @tenant :__ectofdbtxcontext__
-  @tx :__ectofdbtx__
+  def in_tx?(), do: not is_nil(Context.current())
+  def get(), do: Context.tx()
 
-  def in_tenant_tx?() do
-    tenant = Process.get(@tenant)
-    flag = in_tx?() and tenant.__struct__ == Tenant
-    {flag, tenant}
-  end
-
-  def in_tx?(), do: not is_nil(Process.get(@tx))
-  def get(), do: Process.get(@tx)
+  defdelegate fetch_tenant(prefix), to: Context
 
   def safe?(nil) do
-    case in_tenant_tx?() do
-      {true, tenant} ->
-        {true, tenant}
-
-      {false, _} ->
-        {false, :missing_tenant}
+    case Context.tenant() do
+      nil -> {false, :missing_tenant}
+      tenant -> {true, tenant}
     end
   end
 
@@ -52,69 +43,49 @@ defmodule EctoFoundationDB.Layer.Tx do
     end
   end
 
-  def transactional_external(tenant, fun) do
-    nil = Process.get(@tenant)
-    nil = Process.get(@tx)
-
-    :erlfdb.transactional(
-      Tenant.txobj(tenant),
-      fn tx ->
-        Process.put(@tenant, tenant)
-        Process.put(@tx, tx)
-
-        try do
-          cond do
-            is_function(fun, 0) -> fun.()
-            is_function(fun, 1) -> fun.(tx)
-          end
-        after
-          Process.delete(@tx)
-          Process.delete(@tenant)
-        end
-      end
-    )
-  end
-
   def transactional(nil, fun) do
-    case Process.get(@tx, nil) do
+    case Context.current() do
       nil ->
         raise IncorrectTenancy, """
         FoundationDB Adapter has no transactional context to execute on.
         """
 
-      tx ->
+      %Context{tx: tx} ->
         fun.(tx)
     end
   end
 
-  def transactional(context, fun) do
-    case Process.get(@tenant, nil) do
-      nil ->
-        try do
-          Process.put(@tenant, context)
+  # A transaction on a tenant or on a database. When one is already open, the two
+  # policies decide between them whether this work can join it.
+  def transactional(tenant_or_db, fun) do
+    incoming = Context.new(tenant_or_db)
 
-          :erlfdb.transactional(Tenant.txobj(context), fn tx ->
-            Process.put(@tx, tx)
-            fun.(tx)
-          end)
-        after
-          Process.delete(@tx)
-          Process.delete(@tenant)
-        end
+    case Context.current() do
+      nil -> open(incoming, fun)
+      ambient -> join(ambient, incoming, fun)
+    end
+  end
 
-      ^context ->
-        tx = Process.get(@tx, nil)
-        fun.(tx)
+  defp open(context = %Context{}, fun) do
+    :erlfdb.transactional(Context.txobj(context), fn tx ->
+      run(%{context | tx: tx}, fun)
+    end)
+  end
 
-      orig ->
-        raise IncorrectTenancy, """
-        FoundationDB Adapter encountered a transaction where the original transaction context \
-        #{inspect(orig)} did not match the prefix on a struct or query within the transaction: \
-        #{inspect(context)}.
+  defp join(ambient, incoming, fun) do
+    run(Context.join!(ambient, incoming), fun)
+  end
 
-        This can be encountered when a struct read from one tenant is provided to a transaction from \
-        another. In these cases, the prefix must explicitly be removed from the struct metadata.
-        """
+  defp run(context = %Context{tx: tx}, fun) do
+    displaced = Context.enter(context)
+
+    try do
+      cond do
+        is_function(fun, 0) -> fun.()
+        is_function(fun, 1) -> fun.(tx)
+      end
+    after
+      Context.restore(displaced)
     end
   end
 

@@ -186,6 +186,25 @@ defmodule Ecto.Integration.FdbApiCountingTest do
            ] = calls
   end
 
+  test "open new tenant with migrations skipped", context do
+    id = Ecto.UUID.autogenerate()
+
+    {calls, _tenant} =
+      with_erlfdb_calls(context.test, fn ->
+        Tenant.open!(TinyRepo, id, migrate: false)
+      end)
+
+    Tenant.clear_delete!(TinyRepo, id)
+
+    # `migrate: false` skips the Migrator, so TinyRepo's index migration does not
+    # run and nothing but the tenant directory is touched.
+    assert [
+             # -- db_open!: create the tenant directory, then open it --
+             {EctoFoundationDB.Tenant.DirectoryTenant, {:erlfdb_directory, :create}},
+             {:erlfdb_directory_cache, {:erlfdb_directory, :open}}
+           ] = calls
+  end
+
   test "open existing tenant", context = %{tenant_id: tenant_id} do
     {calls, _tenant} =
       with_erlfdb_calls(context.test, fn ->
